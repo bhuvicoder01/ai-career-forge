@@ -7,6 +7,8 @@ spring:
     ollama:
       chat:
         enabled: false
+      embedding:
+        enabled: false
     openai:
       chat:
         enabled: true
@@ -15,7 +17,11 @@ spring:
         options:
           model: ${GOOGLE_AI_MODEL:gemini-1.5-flash}
       embedding:
-        enabled: false # We use MongoDB Atlas Vector Search distance metrics directly, or use Gemini Embeddings if needed
+        enabled: true
+        base-url: https://generativelanguage.googleapis.com/v1beta/openai/
+        api-key: ${GOOGLE_AI_API_KEY}
+        options:
+          model: text-embedding-004
 
   data:
     mongodb:
