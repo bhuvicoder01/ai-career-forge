@@ -19,11 +19,7 @@ spring:
         options:
           model: ${GOOGLE_AI_MODEL:gemini-1.5-flash}
       embedding:
-        enabled: true
-        base-url: https://generativelanguage.googleapis.com/v1beta/openai/
-        api-key: ${GOOGLE_AI_API_KEY}
-        options:
-          model: gemini-embedding-001
+        enabled: false # Bypassing buggy M1 starter; using custom GeminiEmbeddingModel instead
 
   data:
     mongodb:
