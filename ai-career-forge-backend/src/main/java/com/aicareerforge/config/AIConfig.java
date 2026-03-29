@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Profile;
  * Custom AI configuration to handle production-specific overrides.
  */
 @Configuration
+@Profile("prod")
 public class AiConfig {
 
     @Value("${GOOGLE_AI_API_KEY}")
@@ -22,7 +23,6 @@ public class AiConfig {
      */
     @Bean(name = "embeddingModel")
     @Primary
-    @Profile("prod")
     public EmbeddingModel prodEmbeddingModel() {
         return new GeminiEmbeddingModel(apiKey);
     }

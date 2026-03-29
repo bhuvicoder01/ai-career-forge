@@ -5,6 +5,10 @@ spring:
     activate:
       on-profile: prod
 
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.autoconfigure.ollama.OllamaAutoConfiguration
+
   ai:
     ollama:
       chat:
