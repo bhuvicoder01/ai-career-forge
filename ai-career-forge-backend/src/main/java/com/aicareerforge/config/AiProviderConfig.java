@@ -8,11 +8,11 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 
 /**
- * Custom AI configuration to handle production-specific overrides.
+ * Custom AI configuration renamed to AiProviderConfig to bypass Git/OS case-sensitivity traps.
  */
 @Configuration
 @Profile("prod")
-public class AiConfig {
+public class AiProviderConfig {
 
     @Value("${GOOGLE_AI_API_KEY}")
     private String apiKey;
