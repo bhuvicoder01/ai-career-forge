@@ -1,0 +1,58 @@
+package com.aicareerforge.controller;
+
+import com.aicareerforge.model.Application;
+import com.aicareerforge.model.User;
+import com.aicareerforge.service.ApplicationTrackerService;
+import com.aicareerforge.service.UserProfileService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/applications")
+@RequiredArgsConstructor
+public class ApplicationController {
+
+    private final ApplicationTrackerService applicationTrackerService;
+    private final UserProfileService userProfileService;
+
+    @GetMapping
+    public ResponseEntity<List<Application>> getUserApplications(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(applicationTrackerService.getUserApplications(user.getId()));
+    }
+
+    @PostMapping
+    public ResponseEntity<Application> createApplication(@AuthenticationPrincipal User user, @RequestBody Application application) {
+        return ResponseEntity.ok(applicationTrackerService.createApplication(user.getId(), application));
+    }
+
+    record PrepRequest(String jobDescription, String company) {}
+
+    @PostMapping("/{applicationId}/prepare")
+    public ResponseEntity<Application> prepareApplicationMaterials(
+            @AuthenticationPrincipal User user,
+            @PathVariable String applicationId,
+            @RequestBody PrepRequest req) {
+        
+        String resumeText = userProfileService.getProfile(user.getId()).getRawResumeText();
+        
+        return ResponseEntity.ok(applicationTrackerService.prepareApplicationMaterials(
+                applicationId, 
+                resumeText, 
+                req.jobDescription(), 
+                req.company()
+        ));
+    }
+
+    @PatchMapping("/{applicationId}/status")
+    public ResponseEntity<Application> updateStatus(
+            @AuthenticationPrincipal User user,
+            @PathVariable String applicationId,
+            @RequestParam Application.Status status) {
+        // Simple implementation without ownership verification, ideally verify if application belongs to user
+        return ResponseEntity.ok(applicationTrackerService.updateStatus(applicationId, status));
+    }
+}

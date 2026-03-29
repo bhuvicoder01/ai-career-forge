@@ -1,0 +1,40 @@
+# General
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+*.swp
+.idea/
+.vscode/
+
+# Backend (Spring Boot / Maven)
+ai-career-forge-backend/target/
+ai-career-forge-backend/.settings/
+ai-career-forge-backend/.project
+ai-career-forge-backend/.classpath
+ai-career-forge-backend/*.jar
+ai-career-forge-backend/*.war
+ai-career-forge-backend/*.zip
+ai-career-forge-backend/bin/
+
+# Frontend (Next.js / Node)
+ai-career-forge-frontend/node_modules/
+ai-career-forge-frontend/.next/
+ai-career-forge-frontend/out/
+ai-career-forge-frontend/build/
+ai-career-forge-frontend/.env*.local
+
+# Environment & Secrets
+.env
+.env.production
+.env.development
+*.pem
+*.key
+*.cert
+credentials.json
+
+# Maven Wrapper
+.mvn/
+mvnw
+mvnw.cmd

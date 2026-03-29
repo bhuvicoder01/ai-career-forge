@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: ai-career-forge-backend
+  autoconfigure:
+    exclude:
+      - io.awspring.cloud.autoconfigure.core.AwsAutoConfiguration
+      - io.awspring.cloud.autoconfigure.s3.S3AutoConfiguration
+      - io.awspring.cloud.autoconfigure.core.CredentialsProviderAutoConfiguration
+      - io.awspring.cloud.autoconfigure.core.RegionProviderAutoConfiguration
+
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb+srv://bhuvicoder01:9806671598@aicareerforgetestingdat.wtiunqr.mongodb.net/aiCareerForge}
+
+  ai:
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      chat:
+        options:
+          model: ${OLLAMA_CHAT_MODEL:llama3.2}
+      embedding:
+        options:
+          model: ${OLLAMA_EMBEDDING_MODEL:nomic-embed-text}
+    vectorstore:
+      mongodb:
+        collection-name: vector_store
+        index-name: vector_index
+        path-name: embedding
+        metadata-fields-to-filter:
+          - class
+          - type
+          - userId
+
+# cloud:
+#   aws:
+#     credentials:
+#       access-key: ${AWS_ACCESS_KEY_ID:test}
+#       secret-key: ${AWS_SECRET_ACCESS_KEY:test}
+#     region:
+#       static: ${AWS_REGION:us-east-1}
+#     s3:
+#       endpoint: ${AWS_S3_ENDPOINT:}
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+jwt:
+  secret: ${JWT_SECRET:8a3c9b7d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d}
+  expiration: 86400000 # 24 hours
+
+logging:
+  level:
+    org.springframework.ai: DEBUG
+    com.aicareerforge: DEBUG
