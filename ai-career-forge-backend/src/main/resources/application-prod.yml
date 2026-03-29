@@ -23,7 +23,7 @@ spring:
     openai:
       chat:
         enabled: true
-        base-url: https://generativelanguage.googleapis.com/v1beta/openai/
+        base-url: https://generativelanguage.googleapis.com/v1beta/openai
         api-key: ${GOOGLE_AI_API_KEY}
         options:
           model: ${GOOGLE_AI_MODEL:gemini-1.5-flash}

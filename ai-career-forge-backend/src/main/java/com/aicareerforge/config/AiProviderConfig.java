@@ -41,7 +41,7 @@ public class AiProviderConfig {
     @Primary
     public ChatModel chatModel() {
         OpenAiApi openAiApi = new OpenAiApi(
-            "https://generativelanguage.googleapis.com/v1beta/openai/", 
+            "https://generativelanguage.googleapis.com/v1beta/openai", 
             apiKey
         );
         
