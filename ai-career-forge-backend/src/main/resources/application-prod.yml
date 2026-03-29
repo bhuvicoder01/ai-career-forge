@@ -48,6 +48,9 @@ jwt:
     banner-mode: off
     log-startup-info: false
 
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:https://ai-career-forge-sable.vercel.app,http://localhost:3000}
+
 logging:
   level:
     root: WARN
