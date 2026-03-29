@@ -51,6 +51,9 @@ public class GeminiEmbeddingModel implements EmbeddingModel {
             Map<String, Object> embedding = (Map<String, Object>) response.get("embedding");
             @SuppressWarnings("unchecked")
             List<Double> values = (List<Double>) embedding.get("values");
+            if (values != null) {
+                System.err.println("DEBUG: Gemini Embedding produced vector with size: " + values.size());
+            }
             return values;
         } catch (Exception e) {
             throw new RuntimeException("Gemini Embedding API Error: " + e.getMessage(), e);
