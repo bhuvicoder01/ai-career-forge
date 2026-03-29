@@ -17,6 +17,7 @@ ai-career-forge-backend/*.jar
 ai-career-forge-backend/*.war
 ai-career-forge-backend/*.zip
 ai-career-forge-backend/bin/
+ai-career-forge-backend/src/main/resources/application.yml
 
 # Frontend (Next.js / Node)
 ai-career-forge-frontend/node_modules/
@@ -38,3 +39,4 @@ credentials.json
 # .mvn/
 # mvnw
 # mvnw.cmd
+
