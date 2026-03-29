@@ -34,9 +34,10 @@ public class GeminiEmbeddingModel implements EmbeddingModel {
     public List<Double> embed(String text) {
         String url = API_URL + "?key=" + apiKey;
         
-        // Simple Gemini Embedding Request Format
+        // Simple Gemini Embedding Request Format with Forced Dimensionality (768)
         Map<String, Object> requestBody = Map.of(
-            "content", Map.of("parts", List.of(Map.of("text", text)))
+            "content", Map.of("parts", List.of(Map.of("text", text))),
+            "outputDimensionality", 768
         );
         
         try {
