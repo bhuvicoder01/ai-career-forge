@@ -1,0 +1,27 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  ai:
+    ollama:
+      chat:
+        enabled: false
+    openai:
+      chat:
+        enabled: true
+        base-url: https://generativelanguage.googleapis.com/v1beta/openai/
+        api-key: ${GOOGLE_AI_API_KEY}
+        options:
+          model: ${GOOGLE_AI_MODEL:gemini-1.5-flash}
+      embedding:
+        enabled: false # We use MongoDB Atlas Vector Search distance metrics directly, or use Gemini Embeddings if needed
+
+  data:
+    mongodb:
+      uri: ${MONGODB_URI}
+
+logging:
+  level:
+    org.springframework.ai: INFO
+    com.aicareerforge: INFO

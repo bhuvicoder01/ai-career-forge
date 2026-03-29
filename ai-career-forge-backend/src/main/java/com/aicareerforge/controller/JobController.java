@@ -1,7 +1,9 @@
 package com.aicareerforge.controller;
 
 import com.aicareerforge.model.Job;
+import com.aicareerforge.model.JobDetailResponse;
 import com.aicareerforge.model.User;
+import com.aicareerforge.model.UserProfile;
 import com.aicareerforge.service.JobService;
 import com.aicareerforge.service.UserProfileService;
 import lombok.RequiredArgsConstructor;
@@ -31,10 +33,37 @@ public class JobController {
         return ResponseEntity.ok(jobService.getRecommendedJobs(userProfileText));
     }
 
-    @PostMapping("/reseed")
-    public ResponseEntity<String> reseedJobs() {
-        jobService.seedInitialJobs();
+    @GetMapping("/{id}")
+    public ResponseEntity<JobDetailResponse> getJob(@PathVariable String id, @AuthenticationPrincipal User user) {
+        Job job = jobService.getJobById(id);
+        if (job == null) return ResponseEntity.notFound().build();
+        
+        UserProfile profile = userProfileService.getProfile(user.getId());
+        List<String> matchedSkills = jobService.detectMatchedSkills(job, String.join(", ", profile.getSkills()));
+        
+        // Re-calculate match score if not present
+        Double score = job.getMatchScore();
+        if (score == null) score = 75.0; // Default
+        
+        return ResponseEntity.ok(new JobDetailResponse(job, matchedSkills, score));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<Job>> searchAndSyncJobs(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String l) {
+        return ResponseEntity.ok(jobService.fetchAndSyncJobs(q, l));
+    }
+
+    @PostMapping("/reindex")
+    public ResponseEntity<String> reindexJobs() {
         jobService.reindexAllJobs();
-        return ResponseEntity.ok("Jobs seeded and fully re-indexed. Check logs for details.");
+        return ResponseEntity.ok("Full re-indexing triggered.");
+    }
+
+    @DeleteMapping
+    public ResponseEntity<Void> purgeAllJobs() {
+        jobService.purgeAllJobs();
+        return ResponseEntity.noContent().build();
     }
 }

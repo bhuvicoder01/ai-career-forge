@@ -17,6 +17,7 @@ public class UserProfileService {
     private final UserProfileRepository userProfileRepository;
     private final S3Service s3Service;
     private final ProfileAiAgent profileAiAgent;
+    private final JobService jobService;
 
     public UserProfile getProfile(String userId) {
         return userProfileRepository.findByUserId(userId)
@@ -29,6 +30,8 @@ public class UserProfileService {
         if (updatedData.getPreferredLocation() != null) profile.setPreferredLocation(updatedData.getPreferredLocation());
         if (updatedData.getPreferredSalary() != null) profile.setPreferredSalary(updatedData.getPreferredSalary());
         if (updatedData.getPreferredLifestyle() != null) profile.setPreferredLifestyle(updatedData.getPreferredLifestyle());
+        
+        jobService.purgeAllJobs();
         return userProfileRepository.save(profile);
     }
 
@@ -47,6 +50,7 @@ public class UserProfileService {
         profile.setExperiences(extractedInfo.getExperiences());
         profile.setParsedGoals(extractedInfo.getParsedGoals());
         
+        jobService.purgeAllJobs();
         return userProfileRepository.save(profile);
     }
 

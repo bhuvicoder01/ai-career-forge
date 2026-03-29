@@ -34,7 +34,8 @@ ai-career-forge-frontend/.env*.local
 *.cert
 credentials.json
 
-# Maven Wrapper
-.mvn/
-mvnw
-mvnw.cmd
+# Maven Wrapper (Uncommented for Render Build)
+# .mvn/
+# mvnw
+# mvnw.cmd
+ai-career-forge-backend/src/main/resources/application.yml

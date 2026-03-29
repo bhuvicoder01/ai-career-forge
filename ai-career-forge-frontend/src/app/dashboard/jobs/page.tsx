@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import api from "@/lib/api";
-import { Briefcase, MapPin, DollarSign, ExternalLink, Zap, Star } from "lucide-react";
+import Link from "next/link";
+import { Briefcase, MapPin, DollarSign, ExternalLink, Zap, Star, RotateCcw } from "lucide-react";
 
 interface Job {
   id: string;
@@ -19,23 +20,144 @@ interface Job {
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [status, setStatus] = useState("");
+  const [query, setQuery] = useState("");
+  const [location, setLocation] = useState("");
+  const isSyncingRef = useRef(false);
+
+  const fetchRecommended = async () => {
+    try {
+      const response = await api.get("/jobs/recommended");
+      setJobs(response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Failed to fetch recommended jobs:", error);
+      return [];
+    }
+  };
+
+  const autoSyncJobs = async (skills: string[], preferredLoc?: string) => {
+    if (isSyncingRef.current) return;
+    isSyncingRef.current = true;
+    setSyncing(true);
+    
+    // Select top 3 distinct and descriptive skills (length > 2)
+    const targetSkills = skills
+      .filter(s => s.length > 2)
+      .slice(0, 3);
+      
+    if (targetSkills.length === 0) {
+      targetSkills.push("Software Developer");
+    }
+    
+    const searchLocation = preferredLoc || "";
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+    for (let i = 0; i < targetSkills.length; i++) {
+      const currentSkill = targetSkills[i];
+      setRetryCount(i + 1);
+      setStatus(`Syncing ${currentSkill} roles... (${i + 1}/${targetSkills.length})`);
+
+      try {
+        await api.get(`/jobs/search?q=${encodeURIComponent(currentSkill)}&l=${encodeURIComponent(searchLocation)}`);
+        // Refresh periodically so the user starts seeing results
+        await fetchRecommended();
+        
+        // Brief pause to respect Adzuna rate limits (25 per minute = 2.4s per call ideally, but 1.2s is usually safe)
+        if (i < targetSkills.length - 1) {
+            await sleep(1200);
+        }
+      } catch (error) {
+        console.error(`Sync for ${currentSkill} failed:`, error);
+      }
+    }
+
+    setStatus("");
+    setSyncing(false);
+  };
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSyncing(true);
+    setStatus("Syncing real-time jobs...");
+    try {
+      await api.get(`/jobs/search?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}`);
+      await fetchRecommended();
+      setStatus("");
+    } catch (error) {
+      console.error("Manual search failed:", error);
+      setStatus("Manual search failed. Please try again.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!confirm("This will clear all current jobs and perform a fresh, diversified sync based on your profile. Continue?")) {
+        return;
+    }
+
+    setSyncing(true);
+    setStatus("Cleaning up database...");
+    try {
+        await api.delete("/jobs");
+        setJobs([]);
+        isSyncingRef.current = false; // Reset the ref to allow a new auto-sync
+        
+        // Fetch profile and restart sync
+        const profileRes = await api.get("/profile");
+        const profile = profileRes.data;
+        if (profile.skills && profile.skills.length > 0) {
+            autoSyncJobs(profile.skills, profile.preferredLocation);
+        } else {
+            setSyncing(false);
+            setStatus("");
+        }
+    } catch (error) {
+        console.error("Reset failed:", error);
+        setStatus("Reset failed. Please try again.");
+        setSyncing(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchJobs = async () => {
-      try {
-        const response = await api.get("/jobs/recommended");
-        setJobs(response.data);
-      } catch (error) {
-        console.error("Failed to fetch recommended jobs:", error);
-      } finally {
+    const initPage = async () => {
+      setLoading(true);
+      const recommendedJobs = await fetchRecommended();
+
+      // If no jobs exist currently, let's try to auto-sync once based on profile
+      if (recommendedJobs.length === 0 && !isSyncingRef.current) {
+        try {
+          const profileRes = await api.get("/profile");
+          const profile = profileRes.data;
+          
+          if (profile.skills && profile.skills.length > 0) {
+            autoSyncJobs(profile.skills, profile.preferredLocation);
+          } else {
+            setLoading(false);
+          }
+        } catch (error) {
+          console.error("Failed to load profile for auto-sync:", error);
+          setLoading(false);
+        }
+      } else {
         setLoading(false);
       }
     };
 
-    fetchJobs();
+    initPage();
   }, []);
 
-  if (loading) {
+  // Update loading state once sync completes
+  useEffect(() => {
+    if (!syncing && jobs.length > 0) {
+       setLoading(false);
+    }
+  }, [syncing, jobs]);
+
+  if (loading && jobs.length === 0 && !syncing) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -45,12 +167,67 @@ export default function JobsPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Job Recommendations</h1>
-        <p className="text-muted-foreground italic">
-          AI-powered matches based on your unique skills and career goals.
-        </p>
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+      {syncing && (
+        <div className="fixed top-24 right-8 z-50 bg-card border border-primary/20 p-4 rounded-xl shadow-xl flex items-center gap-4 animate-in slide-in-from-right duration-300">
+          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-primary"></div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold">{status}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight">Job Recommendations</h1>
+          <p className="text-muted-foreground italic">
+            AI-powered matches based on your unique skills and career goals.
+          </p>
+        </div>
+
+        {/* Search Bar */}
+        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          <div className="flex-1 sm:w-48">
+            <input
+              type="text"
+              placeholder="What (e.g. Java)"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          <div className="flex-1 sm:w-40">
+            <input
+              type="text"
+              placeholder="Where (e.g. London)"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={syncing}
+            className="bg-secondary text-secondary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 border border-border"
+            title="Clear current jobs and re-sync from scratch"
+          >
+            <RotateCcw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            Reset & Refresh
+          </button>
+          <button
+            type="submit"
+            disabled={syncing}
+            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {syncing ? (
+              <div className="w-4 h-4 border-2 border-current border-t-transparent animate-spin rounded-full"></div>
+            ) : (
+              <Briefcase className="w-4 h-4" />
+            )}
+            Fetch Real Jobs
+          </button>
+        </form>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -84,14 +261,22 @@ export default function JobsPage() {
                 {job.description}
               </div>
 
-              <div className="mt-auto pt-4 flex gap-3">
-                <button className="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground px-4 py-2 rounded-md font-medium text-sm border border-border/50 transition-colors">
-                  Details
-                </button>
-                <button className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md font-medium text-sm transition-colors flex items-center justify-center gap-2">
-                  <Zap className="w-4 h-4" /> Quick Apply
-                </button>
-              </div>
+                <div className="flex gap-3">
+                  <Link
+                    href={`/dashboard/jobs/${job.id}`}
+                    className="flex-1 bg-secondary text-secondary-foreground text-center py-2 rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
+                  >
+                    View Details
+                  </Link>
+                  <a
+                    href={job.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 bg-primary text-primary-foreground text-center py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"
+                  >
+                    Apply <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
             </div>
           ))
         ) : (

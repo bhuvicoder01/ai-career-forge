@@ -7,6 +7,9 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -17,6 +20,13 @@ import java.util.stream.Collectors;
 public class JobRecommendationAgent {
 
     private final VectorStore vectorStore;
+    private final MongoTemplate mongoTemplate;
+
+    public void clearVectorStore() {
+        log.info("Purging all job listings from vector store...");
+        Query query = new Query(Criteria.where("metadata.type").is("job_listing"));
+        mongoTemplate.remove(query, "vector_store");
+    }
 
     public void indexJob(Job job) {
         log.info("Indexing job in vector store: {} (ID: {})", job.getTitle(), job.getId());
