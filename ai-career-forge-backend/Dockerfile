@@ -19,6 +19,10 @@ COPY --from=build /app/target/*.jar app.jar
 
 # JVM arguments for MongoDB reflections
 ENTRYPOINT ["java", \
+    "-Xmx350m", \
+    "-Xms200m", \
+    "-XX:+UseSerialGC", \
+    "-Dspring.profiles.active=prod", \
     "--add-opens", "java.base/java.lang=ALL-UNNAMED", \
     "--add-opens", "java.base/java.util=ALL-UNNAMED", \
     "--add-opens", "java.base/java.lang.reflect=ALL-UNNAMED", \
