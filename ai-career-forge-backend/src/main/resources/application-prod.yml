@@ -29,6 +29,12 @@ spring:
           model: ${GOOGLE_AI_MODEL:gemini-1.5-flash}
       embedding:
         enabled: false # Bypassing buggy M1 starter; using custom GeminiEmbeddingModel instead
+    vectorstore:
+      mongodb:
+        collection-name: vector_store
+        index-name: vector_index
+        path-name: embedding
+        initialize-schema: false
 
   data:
     mongodb:
