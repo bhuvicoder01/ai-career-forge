@@ -15,10 +15,9 @@ import org.springframework.context.annotation.Profile;
  * Custom AI configuration renamed to AiProviderConfig to bypass Git/OS case-sensitivity traps.
  */
 @Configuration
-@Profile("prod")
 public class AiProviderConfig {
 
-    @Value("${GOOGLE_AI_API_KEY}")
+    @Value("${GOOGLE_AI_API_KEY:}")
     private String apiKey;
 
     @Value("${GOOGLE_AI_MODEL:gemini-2.5-flash}")

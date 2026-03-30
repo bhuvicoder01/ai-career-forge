@@ -1,44 +1,154 @@
-# AI CareerForge
+# 🚀 AI CareerForge
 
-AI CareerForge is an agentic, AI-powered career accelerator. It features a Spring Boot 3 + Java 21 backend and a Next.js 15 App router frontend.
+AI CareerForge is a state-of-the-art, agentic AI career platform designed to accelerate your job search. By leveraging **Google Gemini AI**, **Vector Search**, and **Agentic RAG workflows**, it provides personalized career tools like resume tailoring, cover letter generation, and interview preparation.
 
-## Features
+---
 
-- **Agentic RAG Workflows**: Uses Spring AI ChatClient to tailor resumes, write cover letters, and generate company-specific interview prep kits.
-- **Smart Job Matching**: Uses MongoDB Vector Store to match your embedded skillset to job descriptions.
-- **Modern UI**: Built with Next.js 15, TailwindCSS, and shadcn/ui.
-- **Microservices-ready**: JWT Authentication.
+## ✨ Features
 
-## Local Setup
+- **🤖 Agentic RAG Workflows**: Tailor resumes, generate cover letters, and build prep kits specifically for any job description.
+- **🔍 Smart Job Matching**: Uses **MongoDB Atlas Vector Search** to semantically match your profile with real-time job listings.
+- **💼 Real-time Job Search**: Integrated with the **Adzuna API** to pull live career opportunities globally.
+- **📱 Premium UI**: A modern, responsive dashboard built with **Next.js 15**, **TailwindCSS**, and **shadcn/ui**.
+- **🔐 Secure Access**: Built-in JWT-based authentication for a personalized and private experience.
+- **📄 Document Processing**: Automatically extracts text from uploaded PDF resumes.
+
+---
+
+## 🛠️ Tech Stack
+
+### Backend
+- **Framework**: Spring Boot 3.3+ (Java 21)
+- **AI**: Spring AI with Google Gemini (via OpenAI-compatible endpoint)
+- **Database**: MongoDB (Atlas)
+- **Vector Search**: MongoDB Atlas Vector Search
+- **Security**: Spring Security + JWT
+- **Environment**: Dotenv for local variable management
+
+### Frontend
+- **Framework**: Next.js 15 (App Router)
+- **Styling**: TailwindCSS + shadcn/ui
+- **State Management**: React Hooks
+- **Icons**: Lucide React
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
-- JDK 21
-- Node.js 20+ & npm
-- MongoDB Atlas cluster (with vector search capabilities)
-- AWS Account (for S3 bucket)
-- OpenAI API Key
+- **JDK 21**
+- **Node.js 20+** & npm
+- **MongoDB Atlas Cluster** (with Vector Search enabled)
+- **Google AI API Key** (Gemini)
+- **Adzuna API Credentials** (App ID and App Key)
 
-### Backend Setup
-1. Open the full project folder `ai-career-forge`.
-2. Configure `.env.example` as `.env` parameters if running globally, or edit `ai-career-forge-backend/src/main/resources/application.yml` placeholders or export them as shell variables:
-   - `MONGODB_URI`
-   - `OPENAI_API_KEY`
-   - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_S3_ENDPOINT`
-   - `JWT_SECRET`
-3. In `ai-career-forge-backend/`, run:
+---
+
+### 📂 Repository Structure
+```
+ai-career-forge/
+├── ai-career-forge-backend/  # Spring Boot Microservice
+└── ai-career-forge-frontend/ # Next.js Application
+```
+
+---
+
+### ⚙️ Backend Setup
+
+1. **Navigate to the backend directory**:
+   ```bash
+   cd ai-career-forge-backend
+   ```
+
+2. **Configure Environment Variables**:
+   Create a `.env.development` file in the root of the backend directory:
+   ```env
+   # Core
+   MONGODB_URI=your_mongodb_atlas_uri
+   JWT_SECRET=your_jwt_secret_key
+
+   # AI Configuration (Gemini)
+   GOOGLE_AI_API_KEY=your_gemini_api_key
+
+   # Job API (Adzuna)
+   ADZUNA_APP_ID=your_adzuna_id
+   ADZUNA_APP_KEY=your_adzuna_key
+   ```
+
+3. **Run the Application**:
    ```bash
    mvn clean package -DskipTests
    mvn spring-boot:run
    ```
 
-### Frontend Setup
-1. In `ai-career-forge-frontend/`, run:
+---
+
+### 🌐 Frontend Setup
+
+1. **Navigate to the frontend directory**:
+   ```bash
+   cd ai-career-forge-frontend
+   ```
+
+2. **Install Dependencies**:
    ```bash
    npm install
+   ```
+
+3. **Run the Development Server**:
+   ```bash
    npm run dev
    ```
-2. Access the application at `http://localhost:3000`.
+   Open [http://localhost:3000](http://localhost:3000) to view the app.
 
-## Vector DB Setup Instruction for MongoDB Atlas
-1. Follow standard process to configure a Vector Search Index in Atlas.
-2. In your Atlas UI, create an index named `vector_index` against your `vector_store` collection. Use vector dimensionality `1536` for OpenAI `text-embedding-3-small` and `cosine` similarity metric.
+---
+
+## 🧭 Vector DB Configuration (MongoDB Atlas)
+
+To enable semantic job matching, you must create a Vector Search Index in your Atlas UI:
+
+1. Create an index named `vector_index` against your `vector_store` collection.
+2. Use the following JSON configuration:
+   ```json
+   {
+     "fields": [
+       {
+         "numDimensions": 768,
+         "path": "embedding",
+         "similarity": "cosine",
+         "type": "vector"
+       }
+     ]
+   }
+   ```
+> [!NOTE]
+> We use **768 dimensions** for Gemini's `text-embedding-004` (or `gemini-embedding-001`) model.
+
+---
+
+## 🚢 Deployment
+
+The project is pre-configured for deployment on platforms like **Render** or **Vercel**.
+- **Backend**: Use the provided `Dockerfile` or deploy as a Web Service.
+- **Frontend**: Deploy via Vercel for the best Next.js experience.
+
+---
+
+## 🛣️ Roadmap
+
+- [x] Switch from Ollama to Google Gemini for production stability.
+- [x] Add `.env` support for backend local development.
+- [ ] Implement multi-modal profile analysis.
+- [ ] Add direct job application tracking.
+- [ ] Enable persistent AWS S3 storage for static assets.
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License.
+33333
