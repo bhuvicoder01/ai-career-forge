@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { User, Briefcase, FileText, CheckCircle, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import useAuthStore from "@/store/useAuthStore";
 
 import AuthGuard from "@/components/AuthGuard";
@@ -20,7 +21,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <AuthGuard>
       <div className="flex min-h-screen">
         <aside className="w-64 bg-card border-r border-border p-6 flex flex-col gap-6">
-          <div className="font-bold text-2xl tracking-tighter text-blue-400">CareerForge</div>
+          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <Image src="/logo-transparent.png" alt="CareerForge Logo" width={40} height={40} className="object-contain" />
+            <div className="font-bold text-xl tracking-tighter text-blue-400">CareerForge</div>
+          </Link>
           <nav className="flex-1 space-y-2">
             <Link href="/dashboard" className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-secondary text-secondary-foreground font-medium">
               <User className="w-5 h-5" /> Profile
