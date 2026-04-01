@@ -16,7 +16,7 @@ export default function Home() {
       <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-blue-900/20 rounded-full blur-3xl" />
 
       <main className="max-w-4xl text-center space-y-8 z-10 relative">
-        <Image src="/logo-transparent.png" alt="AI CareerForge Logo" width={120} height={120} className="mx-auto drop-shadow-2xl hover:scale-105 transition-transform duration-500 mb-2" priority />
+        <Image src="/logo-transparent.png" alt="AI CareerForge Logo" width={220} height={220} className="mx-auto drop-shadow-[0_20px_50px_rgba(59,130,246,0.3)] hover:scale-110 transition-transform duration-500 mb-6" priority />
         <div className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-sm font-medium text-blue-400 backdrop-blur-3xl mb-4">
           <BrainCircuit className="w-4 h-4 mr-2" />
           <span>AI-Powered Career Accelerator</span>
