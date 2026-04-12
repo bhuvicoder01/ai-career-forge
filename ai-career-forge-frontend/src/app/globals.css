@@ -74,3 +74,34 @@
     @apply bg-background text-foreground;
   }
 }
+
+.navbar{
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+@media (max-width: 768px) {
+.navbar{
+display: flex;
+flex-direction: row;
+justify-content: space-evenly;
+position: sticky;
+top: 0;
+z-index: 1000;
+}
+
+.navbar .nav-links{
+display: none;
+}
+.navbar .nav-logo{
+
+display: flex;
+flex-direction: column;
+}
+.side-control-open{
+display: block;
+}
+.side-control-close{
+display: block;
+}
+}

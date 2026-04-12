@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
+import useAuthStore from '@/store/useAuthStore';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1',
@@ -29,9 +30,8 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth_token');
-        // Optional: redirect to login if not already there
-        // window.location.href = '/auth/login';
+        const logout = useAuthStore.getState().logout;
+        logout();
       }
     }
     return Promise.reject(error);
