@@ -1,3 +1,4 @@
+package com.aicareerforge.service;
 import com.aicareerforge.model.Application;
 import com.aicareerforge.model.User;
 import com.aicareerforge.model.UserProfile;
