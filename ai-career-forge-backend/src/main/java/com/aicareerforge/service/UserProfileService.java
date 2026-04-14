@@ -5,7 +5,6 @@ import com.aicareerforge.repository.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import java.io.IOException;
@@ -37,8 +36,16 @@ public class UserProfileService {
 
     public UserProfile uploadResume(String userId, MultipartFile file) {
         UserProfile profile = getProfile(userId);
-        String s3Url = s3Service.uploadFile(file, userId);
-        profile.setResumeS3Url(s3Url);
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read file", e);
+        }
+        
+        String s3Key = s3Service.uploadFile(bytes, file.getOriginalFilename(), userId);
+        String presignedUrl = s3Service.getPresignedUrl(s3Key);
+        profile.setResumeS3Url(presignedUrl);
         
         // Extract text from the uploaded PDF resume
         String extractedText = extractTextFromPdf(file);
@@ -48,6 +55,9 @@ public class UserProfileService {
         UserProfile extractedInfo = profileAiAgent.extractProfileFromResume(extractedText);
         profile.setSkills(extractedInfo.getSkills());
         profile.setExperiences(extractedInfo.getExperiences());
+        profile.setInternships(extractedInfo.getInternships());
+        profile.setAcademicProjects(extractedInfo.getAcademicProjects());
+        profile.setCertifications(extractedInfo.getCertifications());
         profile.setParsedGoals(extractedInfo.getParsedGoals());
         
         jobService.purgeAllJobs();
@@ -55,7 +65,7 @@ public class UserProfileService {
     }
 
     private String extractTextFromPdf(MultipartFile file) {
-        try (PDDocument document = Loader.loadPDF(file.getBytes())) {
+        try (PDDocument document = PDDocument.load(file.getBytes())) {
             PDFTextStripper stripper = new PDFTextStripper();
             return stripper.getText(document);
         } catch (IOException e) {

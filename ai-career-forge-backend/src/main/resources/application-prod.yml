@@ -1,5 +1,6 @@
 server:
   port: ${PORT:8080}
+
 spring:
   config:
     activate:
@@ -7,39 +8,67 @@ spring:
 
   autoconfigure:
     exclude:
-      - io.awspring.cloud.autoconfigure.core.AwsAutoConfiguration
-      - io.awspring.cloud.autoconfigure.s3.S3AutoConfiguration
-      - io.awspring.cloud.autoconfigure.core.CredentialsProviderAutoConfiguration
-      - io.awspring.cloud.autoconfigure.core.RegionProviderAutoConfiguration
       - org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration
       - org.springframework.ai.autoconfigure.ollama.OllamaAutoConfiguration
 
   ai:
+    ollama:
+      chat:
+        enabled: false
+      embedding:
+        enabled: false
     openai:
       chat:
-        enabled: true # Ensure chat is explicitly enabled for prod if needed, 
-                      # but it's already true in application.yml
+        enabled: true
+        base-url: https://generativelanguage.googleapis.com/v1beta/openai
+        api-key: ${GOOGLE_AI_API_KEY}
+        options:
+          model: ${GOOGLE_AI_MODEL:gemini-2.0-flash}
+      embedding:
+        enabled: false 
     vectorstore:
       mongodb:
         collection-name: vector_store
         index-name: vector_index
         path-name: embedding
         initialize-schema: false
+        metadata-fields-to-filter:
+          - class
+          - type
+          - userId
 
   data:
     mongodb:
       uri: ${MONGODB_URI}
 
-jwt:
-  secret: ${JWT_SECRET:8a3c9b7d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d}
-  expiration: ${JWT_EXPIRATION:86400000}
+  cloud:
+    aws:
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID}
+        secret-key: ${AWS_SECRET_ACCESS_KEY}
+      region:
+        static: ${AWS_REGION:us-east-1}
+      s3:
+        bucket-name: ${AWS_S3_BUCKET_NAME:ai-career-forge-users-data-bucket}
 
   main:
     banner-mode: off
     log-startup-info: false
 
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}
+
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:https://ai-career-forge-sable.vercel.app,http://localhost:3000}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:https://ai-career-forge-sable.vercel.app}
+
+adzuna:
+  app-id: ${ADZUNA_APP_ID}
+  app-key: ${ADZUNA_APP_KEY}
+  country: ${ADZUNA_COUNTRY:in}
+
+app:
+  frontend-url: ${FRONTEND_URL:https://ai-career-forge-sable.vercel.app}
 
 logging:
   level:

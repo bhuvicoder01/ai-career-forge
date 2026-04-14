@@ -177,56 +177,57 @@ export default function JobsPage() {
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-card/30 p-6 rounded-2xl border border-border/50 shadow-sm">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Job Recommendations</h1>
-          <p className="text-muted-foreground italic">
-            AI-powered matches based on your unique skills and career goals.
+          <h1 className="text-4xl font-extrabold tracking-tight text-foreground">Job Recommendations</h1>
+          <p className="text-muted-foreground font-medium max-w-lg">
+            AI-powered matches curated specifically for your profile and career growth.
           </p>
         </div>
 
         {/* Search Bar */}
-        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-          <div className="flex-1 sm:w-48">
+        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+          <div className="flex-1 lg:w-64 xl:w-72">
             <input
               type="text"
-              placeholder="What (e.g. Java)"
+              placeholder="Skill or Title (e.g. Java)"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
             />
           </div>
-          <div className="flex-1 sm:w-40">
+          <div className="flex-1 lg:w-48 xl:w-56">
             <input
               type="text"
               placeholder="Where (e.g. London)"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
             />
           </div>
-          <button
-            type="button"
-            onClick={handleReset}
-            disabled={syncing}
-            className="bg-secondary text-secondary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 border border-border"
-            title="Clear current jobs and re-sync from scratch"
-          >
-            <RotateCcw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-            Reset & Refresh
-          </button>
-          <button
-            type="submit"
-            disabled={syncing}
-            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {syncing ? (
-              <div className="w-4 h-4 border-2 border-current border-t-transparent animate-spin rounded-full"></div>
-            ) : (
-              <Briefcase className="w-4 h-4" />
-            )}
-            Fetch Real Jobs
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={syncing}
+              className="p-2.5 rounded-xl bg-secondary/50 text-secondary-foreground hover:bg-secondary transition-all border border-border disabled:opacity-50"
+              title="Reset & Re-sync Profile"
+            >
+              <RotateCcw className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              type="submit"
+              disabled={syncing}
+              className="flex-1 lg:flex-none px-6 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/90 transition-all disabled:opacity-50 shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+            >
+              {syncing ? (
+                <div className="w-5 h-5 border-2 border-current border-t-transparent animate-spin rounded-full"></div>
+              ) : (
+                <Briefcase className="w-5 h-5" />
+              )}
+              <span className="lg:hidden xl:inline">Fetch Jobs</span>
+            </button>
+          </div>
         </form>
       </div>
 

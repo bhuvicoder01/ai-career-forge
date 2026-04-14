@@ -3,6 +3,7 @@ package com.aicareerforge.service;
 import com.aicareerforge.model.Job;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 import org.springframework.ai.document.Document;
@@ -21,6 +22,7 @@ public class JobRecommendationAgent {
 
     private final VectorStore vectorStore;
     private final MongoTemplate mongoTemplate;
+    private final ChatClient chatClient;
 
     public void clearVectorStore() {
         log.info("Purging all job listings from vector store...");
@@ -58,5 +60,23 @@ public class JobRecommendationAgent {
         List<Document> results = vectorStore.similaritySearch(searchRequest);
         log.info("Vector store returned {} results.", results.size());
         return results;
+    }
+
+    public String generateRelevanceExplanation(Job job, String userProfileText) {
+        log.info("Generating relevance explanation for job: {}", job.getTitle());
+        String prompt = String.format("""
+                SYSTEM: You are a career advisor.
+                USER: Explain in one or two short sentences why the following job is a good match for the candidate based on their profile.
+                Focus on skill alignment and career growth.
+                
+                Candidate Profile: %s
+                Job Title: %s
+                Job Description Snippet: %s
+                """, 
+                userProfileText.substring(0, Math.min(userProfileText.length(), 1000)),
+                job.getTitle(),
+                job.getDescription().substring(0, Math.min(job.getDescription().length(), 500)));
+
+        return chatClient.prompt().user(prompt).call().content();
     }
 }

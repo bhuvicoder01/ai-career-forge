@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 import org.springframework.ai.document.Document;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -23,6 +24,7 @@ public class JobService {
     private final JobRepository jobRepository;
     private final JobRecommendationAgent recommendationAgent;
     private final AdzunaClient adzunaClient;
+    private final CompanyIntelligenceService companyIntelligenceService;
 
     public Page<Job> getJobs(int page, int size) {
         return jobRepository.findAll(PageRequest.of(page, size));
@@ -45,14 +47,34 @@ public class JobService {
                     .url(adzunaJob.getRedirectUrl())
                     .source("adzuna")
                     .sourceJobId("adzuna-" + adzunaJob.getId())
+                    .postedDate(LocalDateTime.now())
                     .build();
             
+            // Enrich with intelligence if it's a new job
+            if (!jobRepository.existsBySourceJobId(job.getSourceJobId())) {
+                 try {
+                     job.setCultureAnalysis(companyIntelligenceService.fetchCultureInsights(job.getCompany(), job.getTitle()));
+                     log.debug("Enriched job with culture insights for {}", job.getCompany());
+                 } catch (Exception e) {
+                     log.error("Failed to enrich job with culture insights: {}", e.getMessage());
+                 }
+            }
+
             Job saved = saveJob(job);
             if (saved != null) syncedJobs.add(saved);
         }
         
         log.info("Successfully synced {} new jobs from Adzuna", syncedJobs.size());
         return syncedJobs;
+    }
+
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 0 */6 * * *") // Every 6 hours
+    public void scheduledJobSync() {
+        log.info("Starting scheduled job sync...");
+        // In a real scenario, we might iterate through popular categories or user interests
+        fetchAndSyncJobs("Software Engineer", "Remote");
+        fetchAndSyncJobs("Data Scientist", "");
+        fetchAndSyncJobs("AI Engineer", "");
     }
 
     public List<Job> getRecommendedJobs(String userProfileData) {
@@ -86,6 +108,14 @@ public class JobService {
                                 job.setMatchScore(75.0); 
                             }
                         }
+                        
+                        // Generate dynamic explanation
+                        try {
+                            job.setRelevanceExplanation(recommendationAgent.generateRelevanceExplanation(job, userProfileData));
+                        } catch (Exception e) {
+                            job.setRelevanceExplanation("Strong alignment with your current skill set and career trajectory.");
+                        }
+                        
                         log.debug("Matched job: {} with score: {}", job.getTitle(), job.getMatchScore());
                     }
                     return job;

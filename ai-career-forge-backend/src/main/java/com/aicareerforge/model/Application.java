@@ -32,7 +32,11 @@ public class Application {
     // Generated materials stored in S3 or plain text
     private String tailoredResumeS3Url;
     private String coverLetterText;
+    private String emailIntroduction;
     private String interviewPrepText;
+    
+    private String relevanceExplanation;
+    private String templateStyle; // CLASSIC, MODERN
 
     public enum Status {
         SAVED, APPLIED, INTERVIEW, OFFER, REJECTED

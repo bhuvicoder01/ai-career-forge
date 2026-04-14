@@ -30,6 +30,7 @@ public class Job {
     // AI Enriched fields
     private String cultureAnalysis;
     private String fairPayEstimate;
+    private String relevanceExplanation;
     
     // Additional info
     private String url;

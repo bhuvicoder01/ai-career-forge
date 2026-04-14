@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <style>
+        @page { margin: 0; }
+        body { font-family: 'Helvetica', sans-serif; margin: 0; padding: 0; color: #2d3748; }
+        .sidebar { position: absolute; left: 0; top: 0; width: 30%; height: 100%; background-color: #2b6cb0; color: white; padding: 40px 20px; box-sizing: border-box; }
+        .main { margin-left: 30%; width: 70%; padding: 40px; box-sizing: border-box; }
+        .name { font-size: 32px; font-weight: 800; margin-bottom: 10px; color: #1a365d; }
+        .sidebar .name { color: white; margin-bottom: 5px; }
+        .role { font-size: 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 30px; opacity: 0.9; }
+        .section-title { font-size: 18px; font-weight: 700; color: #2b6cb0; border-bottom: 2px solid #ebf8ff; padding-bottom: 5px; margin-top: 30px; margin-bottom: 15px; }
+        .sidebar .section-title { color: white; border-color: rgba(255,255,255,0.2); }
+        .contact-item { font-size: 12px; margin-bottom: 10px; display: block; word-wrap: break-word; }
+        .skill-tag { display: inline-block; background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 4px; font-size: 11px; margin: 2px; }
+        .job { margin-bottom: 20px; }
+        .job-header { display: flex; justify-content: space-between; align-items: baseline; }
+        .job-title { font-weight: 700; font-size: 14px; }
+        .job-date { font-size: 11px; color: #718096; }
+        .job-company { font-size: 13px; color: #4a5568; font-weight: 600; margin-bottom: 5px; }
+        .job-desc { font-size: 12px; line-height: 1.6; color: #4a5568; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="name" th:text="${name}">John Doe</div>
+        <div class="role">Software Engineer</div>
+        
+        <div class="section-title">Contact</div>
+        <div class="contact-item" th:text="${email}">john@example.com</div>
+        <div class="contact-item" th:text="${phone}">+1 234 567 890</div>
+        <div class="contact-item" th:text="${location}">New York, NY</div>
+
+        <div class="section-title">Skills</div>
+        <div class="skills-container">
+            <span th:each="skill : ${skills}" class="skill-tag" th:text="${skill}">Java</span>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="section">
+            <div class="section-title">Profile</div>
+            <p class="job-desc" th:text="${summary}">Innovative software engineer with 5+ years of experience...</p>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Work Experience</div>
+            <div th:each="exp : ${experiences}" class="job">
+                <div class="job-header">
+                    <div class="job-title" th:text="${exp.title}">Product Manager</div>
+                    <div class="job-date" th:text="${exp.duration}">2018 - 2021</div>
+                </div>
+                <div class="job-company" th:text="${exp.company}">Global Tech</div>
+                <p class="job-desc" th:text="${exp.description}">Led cross-functional teams to deliver...</p>
+            </div>
+        </div>
+
+        <div th:if="${projects != null}" class="section">
+            <div class="section-title">Projects</div>
+            <div th:each="proj : ${projects}" class="job">
+                <div class="job-title" th:text="${proj.title}">AI Chatbot</div>
+                <div class="job-company" th:text="${proj.technologies}">Python, TensorFlow</div>
+                <p class="job-desc" th:text="${proj.description}"></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

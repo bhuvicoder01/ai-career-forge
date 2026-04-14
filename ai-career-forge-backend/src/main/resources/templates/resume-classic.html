@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <style>
+        body { font-family: 'Times New Roman', serif; line-height: 1.5; color: #333; margin: 40px; }
+        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+        .name { font-size: 28px; font-weight: bold; text-transform: uppercase; }
+        .contact { font-size: 12px; }
+        .section-title { font-size: 16px; font-weight: bold; border-bottom: 1px solid #ccc; margin-top: 20px; margin-bottom: 10px; text-transform: uppercase; }
+        .item { margin-bottom: 15px; }
+        .item-title { font-weight: bold; display: flex; justify-content: space-between; }
+        .item-meta { font-style: italic; font-size: 13px; color: #666; }
+        .description { font-size: 13px; text-align: justify; margin-top: 5px; }
+        ul { margin-top: 5px; padding-left: 20px; }
+        li { font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="name" th:text="${name}">John Doe</div>
+        <div class="contact">
+            <span th:text="${email}">john@example.com</span> | 
+            <span th:text="${phone}">+1 234 567 890</span> | 
+            <span th:text="${location}">New York, NY</span>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Summary</div>
+        <div class="description" th:text="${summary}">A highly motivated professional...</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Experience</div>
+        <div th:each="exp : ${experiences}" class="item">
+            <div class="item-title">
+                <span th:text="${exp.title}">Software Engineer</span>
+                <span th:text="${exp.duration}">2020 - Present</span>
+            </div>
+            <div class="item-meta" th:text="${exp.company}">Tech Corp</div>
+            <div class="description" th:text="${exp.description}">Developed scalable applications...</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Skills</div>
+        <div class="description" th:text="${#strings.listJoin(skills, ', ')}">Java, Spring Boot, AWS</div>
+    </div>
+</body>
+</html>

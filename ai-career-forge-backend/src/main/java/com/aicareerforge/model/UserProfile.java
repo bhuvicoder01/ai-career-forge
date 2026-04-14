@@ -32,11 +32,44 @@ public class UserProfile {
     private String preferredSalary;
     private String preferredLifestyle;
 
+    private List<AcademicProject> academicProjects;
+    private List<Certification> certifications;
+    private List<Internship> internships;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Experience {
         private String title;
+        private String company;
+        private String duration;
+        private String description;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AcademicProject {
+        private String title;
+        private String technologies;
+        private String description;
+        private String link;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Certification {
+        private String name;
+        private String issuingOrganization;
+        private String issueDate;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Internship {
+        private String role;
         private String company;
         private String duration;
         private String description;

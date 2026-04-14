@@ -24,22 +24,21 @@ public class ProfileAiAgent {
                 Return ONLY a valid JSON object. Do not include any preamble, conversational text, or explanation.
                 
                 Rules for extraction:
-                1. "skills": Extract all specific technical skills, programming languages, and tools found in the text.
-                2. "experiences": Extract all work history items with title, company, duration, and a concise description.
-                3. "parsedGoals": Generate a professional one-sentence career objective based on the user's specific skills and experience.
+                1. "skills": Extract all specific technical skills, programming languages, and tools.
+                2. "experiences": Extract all full-time work history.
+                3. "internships": Extract all internship roles separately.
+                4. "academicProjects": Extract significant academic or personal projects with title, tech stack (technologies), and link if available.
+                5. "certifications": Extract all professional certifications with name, issuer, and date.
+                6. "parsedGoals": Generate a professional one-sentence career objective based on the content.
                 
                 Strict JSON structure:
                 {
-                  "skills": ["Skill Name 1", "Skill Name 2"],
-                  "experiences": [
-                    {
-                      "title": "Job Title",
-                      "company": "Company Name",
-                      "duration": "Dates of employment",
-                      "description": "Key responsibilities"
-                    }
-                  ],
-                  "parsedGoals": "A professionally drafted career goal based on the resume content"
+                  "skills": ["Skill 1", "Skill 2"],
+                  "experiences": [{ "title": "...", "company": "...", "duration": "...", "description": "..." }],
+                  "internships": [{ "role": "...", "company": "...", "duration": "...", "description": "..." }],
+                  "academicProjects": [{ "title": "...", "technologies": "...", "description": "...", "link": "..." }],
+                  "certifications": [{ "name": "...", "issuingOrganization": "...", "issueDate": "..." }],
+                  "parsedGoals": "..."
                 }
                 
                 Resume Text Content:
