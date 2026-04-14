@@ -52,7 +52,14 @@ public class ApplicationController {
             @AuthenticationPrincipal User user,
             @PathVariable String applicationId,
             @RequestParam Application.Status status) {
-        // Simple implementation without ownership verification, ideally verify if application belongs to user
-        return ResponseEntity.ok(applicationTrackerService.updateStatus(applicationId, status));
+        return ResponseEntity.ok(applicationTrackerService.updateStatus(applicationId, status, user.getId()));
+    }
+
+    @DeleteMapping("/{applicationId}")
+    public ResponseEntity<Void> deleteApplication(
+            @AuthenticationPrincipal User user,
+            @PathVariable String applicationId) {
+        applicationTrackerService.deleteApplication(applicationId, user.getId());
+        return ResponseEntity.noContent().build();
     }
 }

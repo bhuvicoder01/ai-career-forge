@@ -39,6 +39,6 @@ public class Application {
     private String templateStyle; // CLASSIC, MODERN
 
     public enum Status {
-        SAVED, APPLIED, INTERVIEW, OFFER, REJECTED
+        SAVED, APPLIED, INTERVIEW, OFFER, REJECTED, ARCHIVED
     }
 }

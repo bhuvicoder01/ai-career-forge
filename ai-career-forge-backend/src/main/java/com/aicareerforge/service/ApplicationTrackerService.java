@@ -92,9 +92,20 @@ public class ApplicationTrackerService {
         return applicationRepository.save(app);
     }
 
-    public Application updateStatus(String applicationId, Application.Status status) {
+    public Application updateStatus(String applicationId, Application.Status status, String userId) {
         Application app = applicationRepository.findById(applicationId).orElseThrow();
+        if (!app.getUserId().equals(userId)) {
+            throw new RuntimeException("Unauthorized to update this application");
+        }
         app.setStatus(status);
         return applicationRepository.save(app);
+    }
+
+    public void deleteApplication(String applicationId, String userId) {
+        Application app = applicationRepository.findById(applicationId).orElseThrow();
+        if (!app.getUserId().equals(userId)) {
+            throw new RuntimeException("Unauthorized to delete this application");
+        }
+        applicationRepository.delete(app);
     }
 }

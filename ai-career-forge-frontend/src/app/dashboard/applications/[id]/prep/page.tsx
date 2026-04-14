@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
+import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import Link from "next/link";
 import { 
   ArrowLeft, FileText, LayoutDashboard, 
   Mail, MessageSquare, Download, Eye, Loader2,
-  CheckCircle, Sparkles, AlertCircle
+  CheckCircle, Sparkles, AlertCircle, Trash2
 } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -26,6 +27,7 @@ interface UserProfile {
 }
 
 export default function ApplicationMaterialsPage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter();
   const { id } = use(params);
   const [app, setApp] = useState<Application | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -51,6 +53,18 @@ export default function ApplicationMaterialsPage({ params }: { params: Promise<{
     };
     fetchApp();
   }, [id]);
+
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to permanently delete this application and all materials?")) {
+        return;
+    }
+    try {
+      await api.delete(`/applications/${app?.id}`);
+      router.push("/dashboard/applications");
+    } catch (error) {
+      console.error("Failed to delete application:", error);
+    }
+  };
 
   if (loading) {
     return (
@@ -79,6 +93,12 @@ export default function ApplicationMaterialsPage({ params }: { params: Promise<{
          </div>
          
          <div className="flex gap-3">
+            <button 
+              onClick={handleDelete}
+              className="px-6 py-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-red-500 hover:text-white transition-all"
+            >
+              <Trash2 className="w-4 h-4" /> Delete Mission
+            </button>
             <a 
               href={app.tailoredResumeS3Url}
               target="_blank"
