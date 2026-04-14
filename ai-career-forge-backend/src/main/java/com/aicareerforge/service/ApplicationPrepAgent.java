@@ -1,11 +1,14 @@
 package com.aicareerforge.service;
 
+import com.aicareerforge.model.UserProfile;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -16,18 +19,43 @@ public class ApplicationPrepAgent {
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
 
-    public String tailorResume(String originalResumeText, String jobDescription) {
+    public Map<String, Object> tailorResume(UserProfile profile, String jobDescription) {
+        log.info("Tailoring resume for job description with full profile context.");
         String prompt = String.format("""
                 SYSTEM: You are an ATS expert and professional resume tailor.
-                USER: Analyze the following resume and job description.
-                Identify critical missing keywords. Rewrite and reorder sections to emphasize these skills while staying true to experience.
-                Optimize bullet points for impact (Action Verb + Goal + Result).
-                Return the fully tailored resume in a clean format.
+                USER: Analyze the following user profile and job description.
+                Filter and optimize the content to create a high-impact, ATS-optimized version.
+                
+                You MUST return the response in strict JSON format with the following keys:
+                - "resumeSummary": A 3-4 sentence professional summary tailored to the JD.
+                - "optimizedExperiences": List of objects with { "title", "company", "duration", "description" } where description is tailored (Action Verb + Goal + Result).
+                - "relevantProjects": List of objects with { "title", "technologies", "description" } from the profile that add value.
+                - "relevantCertifications": List of strings (names) from the profile beneficial for this role.
+                - "relevantInternships": List of objects with { "role", "company", "duration", "description" } that are relevant.
+                - "topSkills": A list of the most important technical and soft skills for this role found in the profile or JD.
+                
+                Do not include any markdown formatting around the JSON.
                 
                 JD: %s
-                ORIGINAL RESUME: %s
-                """, jobDescription, originalResumeText);
-        return chatClient.prompt().user(prompt).call().content();
+                PROFILE DATA: %s
+                """, jobDescription, profile.toString());
+
+        try {
+            String response = chatClient.prompt().user(prompt).call().content();
+            String jsonRaw = response.replace("```json", "").replace("```", "").trim();
+            return objectMapper.readValue(jsonRaw, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.error("Failed to tailor resume: {}", e.getMessage());
+            // Fallback to basic profile mapping
+            return Map.of(
+                "resumeSummary", "Professional profile optimized for the role.",
+                "optimizedExperiences", profile.getExperiences(),
+                "relevantProjects", profile.getAcademicProjects() != null ? profile.getAcademicProjects() : List.of(),
+                "relevantCertifications", profile.getCertifications() != null ? profile.getCertifications() : List.of(),
+                "relevantInternships", profile.getInternships() != null ? profile.getInternships() : List.of(),
+                "topSkills", profile.getSkills()
+            );
+        }
     }
 
     public Map<String, String> generateCommunicationKit(String resumeText, String jobDescription) {

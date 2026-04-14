@@ -46,5 +46,35 @@
         <div class="section-title">Skills</div>
         <div class="description" th:text="${#strings.listJoin(skills, ', ')}">Java, Spring Boot, AWS</div>
     </div>
+
+    <div th:if="${internships != null and !internships.isEmpty()}" class="section">
+        <div class="section-title">Internships</div>
+        <div th:each="intern : ${internships}" class="item">
+            <div class="item-title">
+                <span th:text="${intern.role}">Software Intern</span>
+                <span th:text="${intern.duration}">2019</span>
+            </div>
+            <div class="item-meta" th:text="${intern.company}">Innovation Lab</div>
+            <div class="description" th:text="${intern.description}">Assisted in building UI...</div>
+        </div>
+    </div>
+
+    <div th:if="${projects != null and !projects.isEmpty()}" class="section">
+        <div class="section-title">Academic Projects</div>
+        <div th:each="proj : ${projects}" class="item">
+            <div class="item-title">
+                <span th:text="${proj.title}">E-Commerce Platform</span>
+            </div>
+            <div class="item-meta" th:text="${proj.technologies}">React, Node.js</div>
+            <div class="description" th:text="${proj.description}"></p>
+        </div>
+    </div>
+
+    <div th:if="${certifications != null and !certifications.isEmpty()}" class="section">
+        <div class="section-title">Certifications</div>
+        <div class="description">
+            <span th:each="cert, iterStat : ${certifications}" th:text="${cert + (!iterStat.last ? ', ' : '')}">AWS Certified</span>
+        </div>
+    </div>
 </body>
 </html>

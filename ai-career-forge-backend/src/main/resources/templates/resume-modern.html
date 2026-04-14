@@ -35,12 +35,27 @@
         <div class="skills-container">
             <span th:each="skill : ${skills}" class="skill-tag" th:text="${skill}">Java</span>
         </div>
+
+        <div th:if="${certifications != null}" class="section-title">Certifications</div>
+        <div th:each="cert : ${certifications}" class="contact-item" th:text="${cert}">AWS Certified</div>
     </div>
 
     <div class="main">
         <div class="section">
             <div class="section-title">Profile</div>
             <p class="job-desc" th:text="${summary}">Innovative software engineer with 5+ years of experience...</p>
+        </div>
+
+        <div th:if="${internships != null and !internships.isEmpty()}" class="section">
+            <div class="section-title">Internships</div>
+            <div th:each="intern : ${internships}" class="job">
+                <div class="job-header">
+                    <div class="job-title" th:text="${intern.role}">Software Intern</div>
+                    <div class="job-date" th:text="${intern.duration}">Summer 2021</div>
+                </div>
+                <div class="job-company" th:text="${intern.company}">Startup Inc</div>
+                <p class="job-desc" th:text="${intern.description}">Assisted in development...</p>
+            </div>
         </div>
 
         <div class="section">
