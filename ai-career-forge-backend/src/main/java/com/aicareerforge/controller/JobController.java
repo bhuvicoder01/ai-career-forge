@@ -2,9 +2,11 @@ package com.aicareerforge.controller;
 
 import com.aicareerforge.model.Job;
 import com.aicareerforge.model.JobDetailResponse;
+import com.aicareerforge.model.JobSyncStatus;
 import com.aicareerforge.model.User;
 import com.aicareerforge.model.UserProfile;
 import com.aicareerforge.service.JobService;
+import com.aicareerforge.service.JobSyncService;
 import com.aicareerforge.service.UserProfileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -21,6 +23,7 @@ public class JobController {
 
     private final JobService jobService;
     private final UserProfileService userProfileService;
+    private final JobSyncService jobSyncService;
 
     @GetMapping
     public ResponseEntity<Page<Job>> getJobs(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
@@ -59,6 +62,11 @@ public class JobController {
     public ResponseEntity<String> reindexJobs() {
         jobService.reindexAllJobs();
         return ResponseEntity.ok("Full re-indexing triggered.");
+    }
+
+    @GetMapping("/sync-status")
+    public ResponseEntity<JobSyncStatus> getSyncStatus(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(jobSyncService.getSyncStatus(user.getId()));
     }
 
     @DeleteMapping

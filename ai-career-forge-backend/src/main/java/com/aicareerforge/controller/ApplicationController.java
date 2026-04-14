@@ -24,6 +24,11 @@ public class ApplicationController {
         return ResponseEntity.ok(applicationTrackerService.getUserApplications(user.getId()));
     }
 
+    @GetMapping("/{applicationId}")
+    public ResponseEntity<Application> getApplication(@AuthenticationPrincipal User user, @PathVariable String applicationId) {
+        return ResponseEntity.ok(applicationTrackerService.getApplication(applicationId, user.getId()));
+    }
+
     @PostMapping
     public ResponseEntity<Application> createApplication(@AuthenticationPrincipal User user, @RequestBody Application application) {
         return ResponseEntity.ok(applicationTrackerService.createApplication(user.getId(), application));

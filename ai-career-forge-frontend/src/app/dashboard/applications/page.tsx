@@ -91,8 +91,8 @@ export default function ApplicationTracker() {
     <div className="space-y-10 animate-in fade-in duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
-          <h1 className="text-4xl font-black text-white tracking-tight">Application Arsenal</h1>
-          <p className="text-slate-400 font-medium">Manage your agent-generated materials and track your mission progress.</p>
+          <h1 className="text-2xl md:text-4xl font-black text-white tracking-tight">Application Arsenal</h1>
+          <p className="text-sm md:text-base text-slate-400 font-medium">Manage your agent-generated materials and track your mission progress.</p>
         </div>
         
         <div className="flex items-center gap-4">
@@ -126,20 +126,20 @@ export default function ApplicationTracker() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-4 md:gap-6">
         {filteredApps.length > 0 ? (
           filteredApps.map((app) => (
-            <div key={app.id} className="group bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-3xl p-8 hover:bg-slate-900 transition-all border-l-4 border-l-blue-600 relative overflow-hidden">
+            <div key={app.id} className="group bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-2xl md:rounded-3xl p-4 md:p-8 hover:bg-slate-900 transition-all border-l-4 border-l-blue-600 relative overflow-hidden">
               <div className="flex flex-col xl:flex-row gap-8 items-start xl:items-center justify-between relative z-10">
                 
                 {/* Job Info */}
-                <div className="flex items-start gap-6">
-                  <div className="p-5 bg-blue-600/10 text-blue-400 rounded-2xl border border-blue-500/20 shadow-inner">
-                    <Briefcase className="w-8 h-8" />
+                <div className="flex items-start gap-4 md:gap-6">
+                  <div className="p-3 md:p-5 bg-blue-600/10 text-blue-400 rounded-xl md:rounded-2xl border border-blue-500/20 shadow-inner">
+                    <Briefcase className="w-5 h-5 md:w-8 md:h-8" />
                   </div>
-                  <div className="space-y-2">
-                    <h3 className="text-2xl font-black text-white">{app.jobTitle}</h3>
-                    <p className="text-lg text-slate-400 font-semibold">{app.company}</p>
+                  <div className="space-y-1">
+                    <h3 className="text-lg md:text-2xl font-black text-white">{app.jobTitle}</h3>
+                    <p className="text-sm md:text-lg text-slate-400 font-semibold">{app.company}</p>
                     
                     <div className="flex flex-wrap items-center gap-4 mt-4">
                        <span className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black border tracking-wider ${
@@ -164,13 +164,13 @@ export default function ApplicationTracker() {
                 </div>
 
                 {/* Status Stepper */}
-                <div className="flex flex-wrap items-center gap-2 bg-black/20 p-2 rounded-2xl border border-white/5">
+                <div className="flex flex-wrap items-center gap-2 bg-black/20 p-1.5 md:p-2 rounded-xl md:rounded-2xl border border-white/5">
                    {['SAVED', 'APPLIED', 'INTERVIEW', 'OFFER', 'REJECTED'].map((st) => (
                      <button
                        key={st}
                        onClick={() => handleStatusUpdate(app.id, st)}
                        disabled={updatingId === app.id}
-                       className={`px-3 py-1.5 rounded-xl text-[10px] font-black transition-all ${
+                       className={`px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black transition-all ${
                          app.status === st 
                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 scale-105' 
                            : 'hover:bg-white/5 text-slate-500'
@@ -205,15 +205,15 @@ export default function ApplicationTracker() {
                    <a 
                      href={app.tailoredResumeS3Url}
                      target="_blank"
-                     className="flex-1 xl:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-white text-black rounded-2xl text-sm font-black hover:bg-slate-200 transition-all shadow-xl shadow-white/5"
+                     className="flex-1 xl:flex-none flex items-center justify-center gap-2 px-4 py-2.5 md:px-6 md:py-3 bg-white text-black rounded-xl md:rounded-2xl text-xs md:text-sm font-black hover:bg-slate-200 transition-all shadow-xl shadow-white/5"
                    >
-                     <Eye className="w-4 h-4" /> Preview Resume
+                     <Eye className="w-4 h-4" /> <span className="hidden xs:inline">Preview</span> Resume
                    </a>
                    <Link
                      href={`/dashboard/applications/${app.id}/prep`}
-                     className="flex-1 xl:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl text-sm font-black hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/10"
+                     className="flex-1 xl:flex-none flex items-center justify-center gap-2 px-4 py-2.5 md:px-6 md:py-3 bg-blue-600 text-white rounded-xl md:rounded-2xl text-xs md:text-sm font-black hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/10"
                    >
-                     <LayoutDashboard className="w-4 h-4" /> All Materials
+                     <LayoutDashboard className="w-4 h-4" /> <span className="hidden xs:inline">Prep</span> Kit
                    </Link>
                 </div>
               </div>

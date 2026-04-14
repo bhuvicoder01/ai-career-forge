@@ -17,6 +17,7 @@ public class UserProfileService {
     private final S3Service s3Service;
     private final ProfileAiAgent profileAiAgent;
     private final JobService jobService;
+    private final JobSyncService jobSyncService;
 
     public UserProfile getProfile(String userId) {
         return userProfileRepository.findByUserId(userId)
@@ -31,7 +32,9 @@ public class UserProfileService {
         if (updatedData.getPreferredLifestyle() != null) profile.setPreferredLifestyle(updatedData.getPreferredLifestyle());
         
         jobService.purgeAllJobs();
-        return userProfileRepository.save(profile);
+        userProfileRepository.save(profile);
+        jobSyncService.syncJobsForUser(userId);
+        return profile;
     }
 
     public UserProfile uploadResume(String userId, MultipartFile file) {
@@ -61,7 +64,9 @@ public class UserProfileService {
         profile.setParsedGoals(extractedInfo.getParsedGoals());
         
         jobService.purgeAllJobs();
-        return userProfileRepository.save(profile);
+        userProfileRepository.save(profile);
+        jobSyncService.syncJobsForUser(userId);
+        return profile;
     }
 
     private String extractTextFromPdf(MultipartFile file) {

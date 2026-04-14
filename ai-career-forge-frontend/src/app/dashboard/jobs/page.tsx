@@ -38,45 +38,40 @@ export default function JobsPage() {
     }
   };
 
-  const autoSyncJobs = async (skills: string[], preferredLoc?: string) => {
-    if (isSyncingRef.current) return;
-    isSyncingRef.current = true;
-    setSyncing(true);
-    
-    // Select top 3 distinct and descriptive skills (length > 2)
-    const targetSkills = skills
-      .filter(s => s.length > 2)
-      .slice(0, 3);
+  const pollSyncStatus = async () => {
+    try {
+      const response = await api.get("/jobs/sync-status");
+      const data = response.data;
       
-    if (targetSkills.length === 0) {
-      targetSkills.push("Software Developer");
-    }
-    
-    const searchLocation = preferredLoc || "";
-    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-    for (let i = 0; i < targetSkills.length; i++) {
-      const currentSkill = targetSkills[i];
-      setRetryCount(i + 1);
-      setStatus(`Syncing ${currentSkill} roles... (${i + 1}/${targetSkills.length})`);
-
-      try {
-        await api.get(`/jobs/search?q=${encodeURIComponent(currentSkill)}&l=${encodeURIComponent(searchLocation)}`);
-        // Refresh periodically so the user starts seeing results
-        await fetchRecommended();
-        
-        // Brief pause to respect Adzuna rate limits (25 per minute = 2.4s per call ideally, but 1.2s is usually safe)
-        if (i < targetSkills.length - 1) {
-            await sleep(1200);
+      if (data.status === "SYNCING") {
+        setSyncing(true);
+        setStatus(`Syncing ${data.currentSkill || 'roles'}... (${data.progress}/${data.total})`);
+        // Refresh jobs periodically while syncing
+        fetchRecommended();
+      } else if (data.status === "COMPLETED") {
+        if (syncing) {
+            fetchRecommended();
+            setSyncing(false);
+            setStatus("");
         }
-      } catch (error) {
-        console.error(`Sync for ${currentSkill} failed:`, error);
+      } else if (data.status === "FAILED") {
+        setSyncing(false);
+        setStatus("Background sync failed.");
       }
+    } catch (error) {
+      console.error("Failed to poll sync status:", error);
     }
-
-    setStatus("");
-    setSyncing(false);
   };
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (syncing) {
+      interval = setInterval(pollSyncStatus, 3000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [syncing]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,13 +103,12 @@ export default function JobsPage() {
         
         // Fetch profile and restart sync
         const profileRes = await api.get("/profile");
-        const profile = profileRes.data;
-        if (profile.skills && profile.skills.length > 0) {
-            autoSyncJobs(profile.skills, profile.preferredLocation);
-        } else {
-            setSyncing(false);
-            setStatus("");
-        }
+        // The backend triggers sync automatically when profile/skills change via updateProfile or uploadResume
+        // But for a manual reset, we might want to trigger it explicitly if needed.
+        // For now, poll until the backend sync starts.
+        setSyncing(true);
+        setStatus("Triggering fresh sync...");
+        setTimeout(pollSyncStatus, 1000);
     } catch (error) {
         console.error("Reset failed:", error);
         setStatus("Reset failed. Please try again.");
@@ -125,26 +119,10 @@ export default function JobsPage() {
   useEffect(() => {
     const initPage = async () => {
       setLoading(true);
-      const recommendedJobs = await fetchRecommended();
-
-      // If no jobs exist currently, let's try to auto-sync once based on profile
-      if (recommendedJobs.length === 0 && !isSyncingRef.current) {
-        try {
-          const profileRes = await api.get("/profile");
-          const profile = profileRes.data;
-          
-          if (profile.skills && profile.skills.length > 0) {
-            autoSyncJobs(profile.skills, profile.preferredLocation);
-          } else {
-            setLoading(false);
-          }
-        } catch (error) {
-          console.error("Failed to load profile for auto-sync:", error);
-          setLoading(false);
-        }
-      } else {
-        setLoading(false);
-      }
+      await fetchRecommended();
+      // Always check for background sync status on initialization
+      await pollSyncStatus();
+      setLoading(false);
     };
 
     initPage();

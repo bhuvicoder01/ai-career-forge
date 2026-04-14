@@ -29,6 +29,15 @@ public class ApplicationTrackerService {
         return applicationRepository.findByUserId(userId);
     }
 
+    public Application getApplication(String id, String userId) {
+        Application app = applicationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Application not found with id: " + id));
+        if (!app.getUserId().equals(userId)) {
+            throw new RuntimeException("Unauthorized to access this application");
+        }
+        return app;
+    }
+
     public Application createApplication(String userId, Application req) {
         req.setUserId(userId);
         req.setStatus(Application.Status.SAVED);
@@ -37,13 +46,16 @@ public class ApplicationTrackerService {
     }
 
     public Application prepareApplicationMaterials(String applicationId, String resumeText, String jobDescription, String company) {
-        Application app = applicationRepository.findById(applicationId).orElseThrow();
+        Application app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Application not found for preparation: " + applicationId));
         log.info("Preparing materials for application: {} (Company: {})", applicationId, company);
         
         try {
             // 0. Fetch User and Profile Data
-            User user = userRepository.findById(app.getUserId()).orElseThrow();
-            UserProfile profile = userProfileRepository.findByUserId(app.getUserId()).orElseThrow();
+            User user = userRepository.findById(app.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found for application: " + app.getUserId()));
+            UserProfile profile = userProfileRepository.findByUserId(app.getUserId())
+                    .orElseThrow(() -> new RuntimeException("UserProfile not found for user: " + app.getUserId()));
 
             // 1. Tailor Resume (Structured JSON)
             Map<String, Object> tailoredData = prepAgent.tailorResume(profile, jobDescription);
@@ -93,7 +105,8 @@ public class ApplicationTrackerService {
     }
 
     public Application updateStatus(String applicationId, Application.Status status, String userId) {
-        Application app = applicationRepository.findById(applicationId).orElseThrow();
+        Application app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Application not found for status update: " + applicationId));
         if (!app.getUserId().equals(userId)) {
             throw new RuntimeException("Unauthorized to update this application");
         }
@@ -102,7 +115,8 @@ public class ApplicationTrackerService {
     }
 
     public void deleteApplication(String applicationId, String userId) {
-        Application app = applicationRepository.findById(applicationId).orElseThrow();
+        Application app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Application not found for deletion: " + applicationId));
         if (!app.getUserId().equals(userId)) {
             throw new RuntimeException("Unauthorized to delete this application");
         }

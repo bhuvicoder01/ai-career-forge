@@ -39,11 +39,10 @@ export default function ApplicationMaterialsPage({ params }: { params: Promise<{
     const fetchApp = async () => {
       try {
         const [appResponse, profileResponse] = await Promise.all([
-            api.get(`/applications`),
+            api.get(`/applications/${id}`),
             api.get(`/profile`)
         ]);
-        const found = appResponse.data.find((a: Application) => a.id === id);
-        setApp(found);
+        setApp(appResponse.data);
         setProfile(profileResponse.data);
       } catch (error) {
         console.error("Failed to fetch application:", error);
@@ -86,52 +85,51 @@ export default function ApplicationMaterialsPage({ params }: { params: Promise<{
         Back to Tracker
       </Link>
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6">
          <div className="space-y-1">
-            <h1 className="text-4xl font-black text-white">{app.jobTitle}</h1>
-            <p className="text-xl text-blue-400 font-bold">{app.company}</p>
+            <h1 className="text-2xl md:text-4xl font-black text-white">{app.jobTitle}</h1>
+            <p className="text-lg md:text-xl text-blue-400 font-bold">{app.company}</p>
          </div>
          
-         <div className="flex gap-3">
+         <div className="flex gap-2 md:gap-3 w-full md:w-auto">
             <button 
               onClick={handleDelete}
-              className="px-6 py-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-red-500 hover:text-white transition-all"
+              className="flex-1 md:flex-none px-4 md:px-6 py-2.5 md:py-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl md:rounded-2xl font-black text-xs md:text-sm flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all"
             >
-              <Trash2 className="w-4 h-4" /> Delete Mission
+              <Trash2 className="w-4 h-4" /> <span className="md:inline">Delete</span>
             </button>
             <a 
               href={app.tailoredResumeS3Url}
               target="_blank"
-              className="px-6 py-3 bg-white text-black rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-slate-200 transition-all"
+              className="flex-1 md:flex-none px-4 md:px-6 py-2.5 md:py-3 bg-white text-black rounded-xl md:rounded-2xl font-black text-xs md:text-sm flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"
             >
-              <Download className="w-4 h-4" /> Download Resume
+              <Download className="w-4 h-4" /> <span className="md:inline">Resume</span>
             </a>
          </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2 bg-slate-900/50 p-2 rounded-2xl border border-white/10">
+      <div className="flex flex-wrap gap-1.5 md:gap-2 bg-slate-900/50 p-1.5 md:p-2 rounded-xl md:rounded-2xl border border-white/10">
          {[
-           { id: 'RESUME', label: 'Tailored Resume', icon: FileText },
+           { id: 'RESUME', label: 'Resume', icon: FileText },
            { id: 'LETTER', label: 'Cover Letter', icon: Sparkles },
-           { id: 'INTRO', label: 'Email Intro', icon: Mail },
-           { id: 'PREP', label: 'Interview Prep Kit', icon: LayoutDashboard }
+           { id: 'INTRO', label: 'Email', icon: Mail },
+           { id: 'PREP', label: 'Interview', icon: LayoutDashboard }
          ].map(tab => (
            <button
              key={tab.id}
              onClick={() => setActiveTab(tab.id as any)}
-             className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all ${
+             className={`flex items-center gap-1.5 md:gap-2 px-3 py-2 md:px-6 md:py-3 rounded-lg md:rounded-xl text-[10px] md:text-sm font-bold transition-all ${
                activeTab === tab.id ? 'bg-blue-600 text-white' : 'hover:bg-white/5 text-slate-400'
              }`}
            >
-             <tab.icon className="w-4 h-4" />
+             <tab.icon className="w-3.5 h-3.5 md:w-4 md:h-4" />
              {tab.label}
            </button>
          ))}
       </div>
 
       {/* Content Area */}
-      <div className="bg-slate-900/40 border border-white/10 rounded-3xl p-8 md:p-12 min-h-[500px]">
+      <div className="bg-slate-900/40 border border-white/10 rounded-2xl md:rounded-3xl p-4 md:p-12 min-h-[500px]">
          {activeTab === 'RESUME' && (
            <div className="space-y-8">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -167,38 +165,39 @@ export default function ApplicationMaterialsPage({ params }: { params: Promise<{
            </div>
          )}
 
-         {activeTab === 'LETTER' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <h2 className="text-2xl font-black flex items-center gap-3">
-                   <Sparkles className="w-6 h-6 text-purple-400" /> Personalized Cover Letter
-                </h2>
-                <div className="bg-slate-950/50 border border-white/5 rounded-2xl p-10 text-slate-300 leading-relaxed whitespace-pre-wrap font-serif text-lg">
-                   {app.coverLetterText}
-                </div>
-            </div>
-         )}
+          {activeTab === 'LETTER' && (
+             <div className="space-y-4 md:space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                 <h2 className="text-xl md:text-2xl font-black flex items-center gap-3">
+                    <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-purple-400" /> Cover Letter
+                 </h2>
+                 <div className="bg-slate-950/50 border border-white/5 rounded-xl md:rounded-2xl p-6 md:p-10 text-slate-300 leading-relaxed whitespace-pre-wrap font-serif text-base md:text-lg">
+                    {app.coverLetterText}
+                 </div>
+             </div>
+          )}
 
-         {activeTab === 'INTRO' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <h2 className="text-2xl font-black flex items-center gap-3">
-                   <Mail className="w-6 h-6 text-green-400" /> Professional Email Introduction
-                </h2>
-                <div className="bg-slate-950/50 border border-white/5 rounded-2xl p-8 text-slate-300 leading-relaxed whitespace-pre-wrap font-mono relative">
-                   <div className="absolute top-4 right-4 text-[10px] text-slate-600 font-bold uppercase tracking-widest">Copy to Clipboard</div>
-                   {app.emailIntroduction}
-                </div>
-            </div>
-         )}
+          {activeTab === 'INTRO' && (
+             <div className="space-y-4 md:space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                 <h2 className="text-xl md:text-2xl font-black flex items-center gap-3">
+                    <Mail className="w-5 h-5 md:w-6 md:h-6 text-green-400" /> Email Introduction
+                 </h2>
+                 <div className="bg-slate-950/50 border border-white/5 rounded-xl md:rounded-2xl p-5 md:p-8 text-slate-300 leading-relaxed whitespace-pre-wrap font-mono text-xs md:text-sm relative">
+                    <div className="absolute top-2 right-2 text-[8px] text-slate-600 font-bold uppercase tracking-widest md:hidden">Copy</div>
+                    <div className="absolute top-4 right-4 text-[10px] text-slate-600 font-bold uppercase tracking-widest hidden md:block">Copy to Clipboard</div>
+                    {app.emailIntroduction}
+                 </div>
+             </div>
+          )}
 
          {activeTab === 'PREP' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <h2 className="text-2xl font-black flex items-center gap-3">
                    <LayoutDashboard className="w-6 h-6 text-orange-400" /> Complete Interview Preparation Kit
                 </h2>
-                <div className="prose prose-invert prose-blue max-w-none">
-                   {app.interviewPrepText ? (
-                     <div className="bg-slate-950/30 p-8 md:p-12 rounded-3xl border border-white/5">
-                        <div className="prose prose-invert prose-blue max-w-none prose-p:leading-relaxed prose-headings:font-black prose-li:text-slate-300">
+                 <div className="prose prose-sm md:prose-base prose-invert prose-blue max-w-none">
+                    {app.interviewPrepText ? (
+                      <div className="bg-slate-950/30 p-4 md:p-12 rounded-2xl md:rounded-3xl border border-white/5">
+                         <div className="prose prose-sm md:prose-base prose-invert prose-blue max-w-none prose-p:leading-relaxed prose-headings:font-black prose-li:text-slate-300">
                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
                               {app.interviewPrepText}
                            </ReactMarkdown>

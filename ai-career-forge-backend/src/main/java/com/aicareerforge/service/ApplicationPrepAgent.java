@@ -77,7 +77,7 @@ public class ApplicationPrepAgent {
             String response = chatClient.prompt().user(prompt).call().content();
             // Basic cleanup in case of markdown blocks
             String jsonRaw = response.replace("```json", "").replace("```", "").trim();
-            return objectMapper.readValue(jsonRaw, Map.of("coverLetter", String.class, "emailIntro", String.class).getClass());
+            return objectMapper.readValue(jsonRaw, new TypeReference<Map<String, String>>() {});
         } catch (Exception e) {
             log.error("Failed to generate communication kit: {}", e.getMessage());
             return Map.of(
