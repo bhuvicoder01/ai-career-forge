@@ -8,6 +8,8 @@ import {
   Mail, MessageSquare, Download, Eye, Loader2,
   CheckCircle, Sparkles, AlertCircle
 } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface Application {
   id: string;
@@ -175,10 +177,11 @@ export default function ApplicationMaterialsPage({ params }: { params: Promise<{
                 </h2>
                 <div className="prose prose-invert prose-blue max-w-none">
                    {app.interviewPrepText ? (
-                     <div className="bg-slate-950/30 p-8 rounded-3xl border border-white/5 space-y-6">
-                        {/* Rendering the markdown formatted prep kit */}
-                        <div className="whitespace-pre-wrap text-slate-300 leading-8">
-                           {app.interviewPrepText}
+                     <div className="bg-slate-950/30 p-8 md:p-12 rounded-3xl border border-white/5">
+                        <div className="prose prose-invert prose-blue max-w-none prose-p:leading-relaxed prose-headings:font-black prose-li:text-slate-300">
+                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {app.interviewPrepText}
+                           </ReactMarkdown>
                         </div>
                      </div>
                    ) : (
