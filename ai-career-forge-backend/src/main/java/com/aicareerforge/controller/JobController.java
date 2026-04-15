@@ -7,12 +7,15 @@ import com.aicareerforge.model.User;
 import com.aicareerforge.model.UserProfile;
 import com.aicareerforge.service.JobService;
 import com.aicareerforge.service.JobSyncService;
+import com.aicareerforge.service.SyncSseEmitterRegistry;
 import com.aicareerforge.service.UserProfileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -24,6 +27,7 @@ public class JobController {
     private final JobService jobService;
     private final UserProfileService userProfileService;
     private final JobSyncService jobSyncService;
+    private final SyncSseEmitterRegistry sseRegistry;
 
     @GetMapping
     public ResponseEntity<Page<Job>> getJobs(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
@@ -32,8 +36,8 @@ public class JobController {
 
     @GetMapping("/recommended")
     public ResponseEntity<List<Job>> getRecommendedJobs(@AuthenticationPrincipal User user) {
-        String userProfileText = userProfileService.getProfile(user.getId()).getRawResumeText();
-        return ResponseEntity.ok(jobService.getRecommendedJobs(userProfileText));
+        UserProfile profile = userProfileService.getProfile(user.getId());
+        return ResponseEntity.ok(jobService.getRecommendedJobs(profile));
     }
 
     @GetMapping("/{id}")
@@ -67,6 +71,19 @@ public class JobController {
     @GetMapping("/sync-status")
     public ResponseEntity<JobSyncStatus> getSyncStatus(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(jobSyncService.getSyncStatus(user.getId()));
+    }
+
+    @GetMapping(value = "/sync-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamSyncStatus(@AuthenticationPrincipal User user) {
+        SseEmitter emitter = sseRegistry.createEmitter(user.getId());
+        // Send the current status immediately so the client knows where things stand
+        try {
+            JobSyncStatus currentStatus = jobSyncService.getSyncStatus(user.getId());
+            emitter.send(SseEmitter.event().name("sync-status").data(currentStatus));
+        } catch (Exception e) {
+            // ignore — client will receive future events
+        }
+        return emitter;
     }
 
     @DeleteMapping

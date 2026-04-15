@@ -9,6 +9,8 @@ import {
   Clock, Share2, Sparkles, MessageSquare, Target,
   FileText, Layout, ChevronDown, Loader2
 } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface Job {
   id: string;
@@ -213,21 +215,23 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
           </div>
 
           {/* Company Culture (RAG) */}
-          <div className="bg-slate-900/40 border border-white/10 rounded-3xl p-10 space-y-6">
+          <div className="bg-slate-900/40 border border-white/10 rounded-3xl p-6 md:p-10 space-y-6">
              <h3 className="text-2xl font-black flex items-center gap-3">
                 <Building2 className="w-7 h-7 text-blue-500" />
                 Company Culture & Environment
              </h3>
-             <div className="prose prose-invert prose-slate max-w-none text-slate-300">
                {job.cultureAnalysis ? (
-                 <div className="whitespace-pre-wrap">{job.cultureAnalysis}</div>
+                 <div className="prose prose-sm md:prose-base prose-invert prose-blue max-w-none prose-p:leading-relaxed prose-headings:font-black prose-li:text-slate-300 prose-strong:text-white">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                       {job.cultureAnalysis}
+                    </ReactMarkdown>
+                 </div>
                ) : (
                  <div className="flex flex-col items-center justify-center py-10 gap-4 opacity-50">
                     <Loader2 className="w-10 h-10 animate-spin" />
                     <p className="font-bold">Crawling Glassdoor and Quora for real insights...</p>
                  </div>
                )}
-             </div>
           </div>
 
           {/* JD */}

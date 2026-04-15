@@ -21,6 +21,7 @@ public class JobSyncService {
     private final JobService jobService;
     private final JobSyncStatusRepository syncStatusRepository;
     private final UserProfileRepository userProfileRepository;
+    private final SyncSseEmitterRegistry sseRegistry;
 
     @Async
     public void syncJobsForUser(String userId) {
@@ -50,6 +51,7 @@ public class JobSyncService {
         status.setTotal(targetSkills.size());
         status.setLastUpdated(LocalDateTime.now());
         syncStatusRepository.save(status);
+        sseRegistry.sendStatus(userId, status);
 
         for (int i = 0; i < targetSkills.size(); i++) {
             String currentSkill = targetSkills.get(i);
@@ -57,6 +59,7 @@ public class JobSyncService {
             status.setProgress(i + 1);
             status.setLastUpdated(LocalDateTime.now());
             syncStatusRepository.save(status);
+            sseRegistry.sendStatus(userId, status);
 
             try {
                 log.info("Syncing {} roles for user {} ({}/{})", currentSkill, userId, i + 1, targetSkills.size());
@@ -75,6 +78,7 @@ public class JobSyncService {
         status.setCurrentSkill(null);
         status.setLastUpdated(LocalDateTime.now());
         syncStatusRepository.save(status);
+        sseRegistry.sendStatus(userId, status);
         log.info("Background job sync completed for user: {}", userId);
     }
 

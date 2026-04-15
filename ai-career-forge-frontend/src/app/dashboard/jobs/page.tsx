@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import api from "@/lib/api";
 import Link from "next/link";
 import { Briefcase, MapPin, DollarSign, ExternalLink, Zap, Star, RotateCcw } from "lucide-react";
@@ -17,15 +17,21 @@ interface Job {
   url?: string;
 }
 
+interface SyncStatus {
+  status: 'IDLE' | 'SYNCING' | 'COMPLETED' | 'FAILED';
+  currentSkill?: string;
+  progress?: number;
+  total?: number;
+}
+
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
   const [status, setStatus] = useState("");
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
-  const isSyncingRef = useRef(false);
+  const eventSourceRef = useRef<AbortController | null>(null);
 
   const fetchRecommended = async () => {
     try {
@@ -38,40 +44,79 @@ export default function JobsPage() {
     }
   };
 
-  const pollSyncStatus = async () => {
-    try {
-      const response = await api.get("/jobs/sync-status");
-      const data = response.data;
-      
-      if (data.status === "SYNCING") {
-        setSyncing(true);
-        setStatus(`Syncing ${data.currentSkill || 'roles'}... (${data.progress}/${data.total})`);
-        // Refresh jobs periodically while syncing
-        fetchRecommended();
-      } else if (data.status === "COMPLETED") {
-        if (syncing) {
-            fetchRecommended();
-            setSyncing(false);
-            setStatus("");
-        }
-      } else if (data.status === "FAILED") {
-        setSyncing(false);
-        setStatus("Background sync failed.");
-      }
-    } catch (error) {
-      console.error("Failed to poll sync status:", error);
+  // Connect to SSE stream for real-time sync status
+  const connectSyncStream = useCallback(() => {
+    // Clean up previous connection
+    if (eventSourceRef.current) {
+      eventSourceRef.current.abort();
     }
-  };
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (syncing) {
-      interval = setInterval(pollSyncStatus, 3000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [syncing]);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    if (!token) return;
+
+    const controller = new AbortController();
+    eventSourceRef.current = controller;
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+
+    fetch(`${baseUrl}/jobs/sync-stream`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'text/event-stream',
+      },
+      signal: controller.signal,
+    }).then(response => {
+      if (!response.ok || !response.body) return;
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      const processStream = async () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data:')) {
+              try {
+                const data: SyncStatus = JSON.parse(line.substring(5).trim());
+
+                if (data.status === 'SYNCING') {
+                  setSyncing(true);
+                  setStatus(`Syncing ${data.currentSkill || 'roles'}... (${data.progress}/${data.total})`);
+                  fetchRecommended();
+                } else if (data.status === 'COMPLETED') {
+                  fetchRecommended();
+                  setSyncing(false);
+                  setStatus("");
+                } else if (data.status === 'FAILED') {
+                  setSyncing(false);
+                  setStatus("Background sync failed.");
+                }
+              } catch {
+                // ignore parse errors from partial data
+              }
+            }
+          }
+        }
+      };
+
+      processStream().catch(err => {
+        if (err.name !== 'AbortError') {
+          console.error('SSE stream error:', err);
+        }
+      });
+    }).catch(err => {
+      if (err.name !== 'AbortError') {
+        console.error('SSE connection error:', err);
+      }
+    });
+  }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,16 +144,12 @@ export default function JobsPage() {
     try {
         await api.delete("/jobs");
         setJobs([]);
-        isSyncingRef.current = false; // Reset the ref to allow a new auto-sync
         
-        // Fetch profile and restart sync
-        const profileRes = await api.get("/profile");
-        // The backend triggers sync automatically when profile/skills change via updateProfile or uploadResume
-        // But for a manual reset, we might want to trigger it explicitly if needed.
-        // For now, poll until the backend sync starts.
+        // After purge, the backend will need a trigger to re-sync.
+        // Connect the SSE stream to catch the sync when it starts.
         setSyncing(true);
         setStatus("Triggering fresh sync...");
-        setTimeout(pollSyncStatus, 1000);
+        connectSyncStream();
     } catch (error) {
         console.error("Reset failed:", error);
         setStatus("Reset failed. Please try again.");
@@ -120,13 +161,20 @@ export default function JobsPage() {
     const initPage = async () => {
       setLoading(true);
       await fetchRecommended();
-      // Always check for background sync status on initialization
-      await pollSyncStatus();
+      // Connect to SSE for real-time sync updates
+      connectSyncStream();
       setLoading(false);
     };
 
     initPage();
-  }, []);
+
+    return () => {
+      // Cleanup SSE connection on unmount
+      if (eventSourceRef.current) {
+        eventSourceRef.current.abort();
+      }
+    };
+  }, [connectSyncStream]);
 
   // Update loading state once sync completes
   useEffect(() => {
@@ -189,7 +237,7 @@ export default function JobsPage() {
               onClick={handleReset}
               disabled={syncing}
               className="p-2.5 rounded-xl bg-secondary/50 text-secondary-foreground hover:bg-secondary transition-all border border-border disabled:opacity-50"
-              title="Reset & Re-sync Profile"
+              title="Reset &amp; Re-sync Profile"
             >
               <RotateCcw className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} />
             </button>
