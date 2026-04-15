@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import Link from "next/link";
-import { Briefcase, MapPin, DollarSign, ExternalLink, Zap, Star, RotateCcw } from "lucide-react";
+import { Briefcase, MapPin, DollarSign, ExternalLink, Star, RotateCcw } from "lucide-react";
+import useSyncStore from "@/store/useSyncStore";
 
 interface Job {
   id: string;
@@ -17,21 +18,17 @@ interface Job {
   url?: string;
 }
 
-interface SyncStatus {
-  status: 'IDLE' | 'SYNCING' | 'COMPLETED' | 'FAILED';
-  currentSkill?: string;
-  progress?: number;
-  total?: number;
-}
-
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [status, setStatus] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchStatus, setSearchStatus] = useState("");
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
-  const eventSourceRef = useRef<AbortController | null>(null);
+
+  // Read sync status from the global store (managed at layout level)
+  const syncStatus = useSyncStore((state) => state.syncStatus);
+  const isSyncing = syncStatus.status === 'SYNCING';
 
   const fetchRecommended = async () => {
     try {
@@ -44,93 +41,37 @@ export default function JobsPage() {
     }
   };
 
-  // Connect to SSE stream for real-time sync status
-  const connectSyncStream = useCallback(() => {
-    // Clean up previous connection
-    if (eventSourceRef.current) {
-      eventSourceRef.current.abort();
+  // Refresh jobs when sync completes
+  useEffect(() => {
+    if (syncStatus.status === 'COMPLETED') {
+      fetchRecommended();
     }
+  }, [syncStatus.status]);
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    if (!token) return;
-
-    const controller = new AbortController();
-    eventSourceRef.current = controller;
-
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
-
-    fetch(`${baseUrl}/jobs/sync-stream`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'text/event-stream',
-      },
-      signal: controller.signal,
-    }).then(response => {
-      if (!response.ok || !response.body) return;
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      const processStream = async () => {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (line.startsWith('data:')) {
-              try {
-                const data: SyncStatus = JSON.parse(line.substring(5).trim());
-
-                if (data.status === 'SYNCING') {
-                  setSyncing(true);
-                  setStatus(`Syncing ${data.currentSkill || 'roles'}... (${data.progress}/${data.total})`);
-                  fetchRecommended();
-                } else if (data.status === 'COMPLETED') {
-                  fetchRecommended();
-                  setSyncing(false);
-                  setStatus("");
-                } else if (data.status === 'FAILED') {
-                  setSyncing(false);
-                  setStatus("Background sync failed.");
-                }
-              } catch {
-                // ignore parse errors from partial data
-              }
-            }
-          }
-        }
-      };
-
-      processStream().catch(err => {
-        if (err.name !== 'AbortError') {
-          console.error('SSE stream error:', err);
-        }
-      });
-    }).catch(err => {
-      if (err.name !== 'AbortError') {
-        console.error('SSE connection error:', err);
-      }
-    });
-  }, []);
+  // Also refresh periodically while syncing to show partial results
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isSyncing) {
+      interval = setInterval(fetchRecommended, 8000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isSyncing]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSyncing(true);
-    setStatus("Syncing real-time jobs...");
+    setSearching(true);
+    setSearchStatus("Syncing real-time jobs...");
     try {
       await api.get(`/jobs/search?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}`);
       await fetchRecommended();
-      setStatus("");
+      setSearchStatus("");
     } catch (error) {
       console.error("Manual search failed:", error);
-      setStatus("Manual search failed. Please try again.");
+      setSearchStatus("Manual search failed. Please try again.");
     } finally {
-      setSyncing(false);
+      setSearching(false);
     }
   };
 
@@ -139,21 +80,17 @@ export default function JobsPage() {
         return;
     }
 
-    setSyncing(true);
-    setStatus("Cleaning up database...");
+    setSearching(true);
+    setSearchStatus("Cleaning up database...");
     try {
         await api.delete("/jobs");
         setJobs([]);
-        
-        // After purge, the backend will need a trigger to re-sync.
-        // Connect the SSE stream to catch the sync when it starts.
-        setSyncing(true);
-        setStatus("Triggering fresh sync...");
-        connectSyncStream();
+        setSearchStatus("Jobs cleared. Upload or update your profile to trigger a fresh sync.");
     } catch (error) {
         console.error("Reset failed:", error);
-        setStatus("Reset failed. Please try again.");
-        setSyncing(false);
+        setSearchStatus("Reset failed. Please try again.");
+    } finally {
+      setSearching(false);
     }
   };
 
@@ -161,29 +98,12 @@ export default function JobsPage() {
     const initPage = async () => {
       setLoading(true);
       await fetchRecommended();
-      // Connect to SSE for real-time sync updates
-      connectSyncStream();
       setLoading(false);
     };
-
     initPage();
+  }, []);
 
-    return () => {
-      // Cleanup SSE connection on unmount
-      if (eventSourceRef.current) {
-        eventSourceRef.current.abort();
-      }
-    };
-  }, [connectSyncStream]);
-
-  // Update loading state once sync completes
-  useEffect(() => {
-    if (!syncing && jobs.length > 0) {
-       setLoading(false);
-    }
-  }, [syncing, jobs]);
-
-  if (loading && jobs.length === 0 && !syncing) {
+  if (loading && jobs.length === 0 && !isSyncing) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -194,15 +114,6 @@ export default function JobsPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      {syncing && (
-        <div className="fixed top-24 right-8 z-50 bg-card border border-primary/20 p-4 rounded-xl shadow-xl flex items-center gap-4 animate-in slide-in-from-right duration-300">
-          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-primary"></div>
-          <div className="space-y-1">
-            <p className="text-sm font-semibold">{status}</p>
-          </div>
-        </div>
-      )}
-
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-card/30 p-6 rounded-2xl border border-border/50 shadow-sm">
         <div className="space-y-2">
           <h1 className="text-4xl font-extrabold tracking-tight text-foreground">Job Recommendations</h1>
@@ -235,18 +146,18 @@ export default function JobsPage() {
             <button
               type="button"
               onClick={handleReset}
-              disabled={syncing}
+              disabled={searching || isSyncing}
               className="p-2.5 rounded-xl bg-secondary/50 text-secondary-foreground hover:bg-secondary transition-all border border-border disabled:opacity-50"
               title="Reset &amp; Re-sync Profile"
             >
-              <RotateCcw className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} />
+              <RotateCcw className={`w-5 h-5 ${(searching || isSyncing) ? 'animate-spin' : ''}`} />
             </button>
             <button
               type="submit"
-              disabled={syncing}
+              disabled={searching || isSyncing}
               className="flex-1 lg:flex-none px-6 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/90 transition-all disabled:opacity-50 shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
             >
-              {syncing ? (
+              {searching ? (
                 <div className="w-5 h-5 border-2 border-current border-t-transparent animate-spin rounded-full"></div>
               ) : (
                 <Briefcase className="w-5 h-5" />
@@ -256,6 +167,12 @@ export default function JobsPage() {
           </div>
         </form>
       </div>
+
+      {searchStatus && (
+        <div className="text-sm text-muted-foreground bg-card/50 px-4 py-2 rounded-xl border border-border/50">
+          {searchStatus}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {jobs.length > 0 ? (

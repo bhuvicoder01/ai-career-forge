@@ -83,10 +83,24 @@ public class JobSyncService {
     }
 
     public JobSyncStatus getSyncStatus(String userId) {
-        return syncStatusRepository.findById(userId)
+        JobSyncStatus status = syncStatusRepository.findById(userId)
                 .orElse(JobSyncStatus.builder()
                         .userId(userId)
                         .status(JobSyncStatus.SyncStatus.IDLE)
                         .build());
+
+        // Recover from stale SYNCING state (e.g. server crashed mid-sync)
+        if (status.getStatus() == JobSyncStatus.SyncStatus.SYNCING
+                && status.getLastUpdated() != null
+                && status.getLastUpdated().isBefore(LocalDateTime.now().minusMinutes(5))) {
+            log.warn("Detected stale SYNCING status for user {}. Last updated: {}. Resetting to IDLE.",
+                    userId, status.getLastUpdated());
+            status.setStatus(JobSyncStatus.SyncStatus.IDLE);
+            status.setCurrentSkill(null);
+            status.setLastUpdated(LocalDateTime.now());
+            syncStatusRepository.save(status);
+        }
+
+        return status;
     }
 }

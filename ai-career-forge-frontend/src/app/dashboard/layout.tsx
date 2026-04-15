@@ -8,7 +8,9 @@ import useAuthStore from "@/store/useAuthStore";
 
 import AuthGuard from "@/components/AuthGuard";
 import FloatingAiAssistant from "@/components/FloatingAiAssistant";
+import useSyncStore from "@/store/useSyncStore";
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -17,6 +19,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Global SSE connection for sync status
+  const { syncStatus, connect, disconnect } = useSyncStore();
+  const isSyncing = syncStatus.status === 'SYNCING';
 
   const handleLogout = () => {
     logout();
@@ -32,6 +38,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Connect SSE stream once at layout level — survives page navigation
+  useEffect(() => {
+    connect();
+    return () => disconnect();
+  }, [connect, disconnect]);
 
   // Close sidebar when clicking a link (on mobile)
   useEffect(() => {
@@ -141,6 +153,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
 
         <main className={`flex-1 bg-background ${isMobile ? 'p-4' : 'p-8'} overflow-y-auto w-full`}>
+          {/* Global sync status indicator */}
+          {isSyncing && (
+            <div className="mb-6 flex items-center gap-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 px-5 py-3 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <div className="flex-1">
+                <p className="text-sm font-bold">Background Job Sync</p>
+                <p className="text-xs text-blue-400/70">
+                  Syncing {syncStatus.currentSkill || 'roles'}... ({syncStatus.progress}/{syncStatus.total})
+                </p>
+              </div>
+              <div className="text-xs font-mono bg-blue-500/20 px-2 py-1 rounded-lg">
+                {syncStatus.progress}/{syncStatus.total}
+              </div>
+            </div>
+          )}
           {children}
         </main>
       </div>
