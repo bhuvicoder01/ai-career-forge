@@ -82,7 +82,11 @@ app:
   frontend-url: ${FRONTEND_URL:https://ai-career-forge-sable.vercel.app}
 
 logo:
-  dev: ${LOGO_DEV_TOKEN}
+  dev: 
+    token: ${LOGO_DEV_TOKEN}
+
+brandfetch:
+  api-token: ${BRANDFETCH_TOKEN}
 
 logging:
   level:
