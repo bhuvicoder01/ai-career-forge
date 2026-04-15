@@ -39,6 +39,7 @@ public class Job {
     private LocalDateTime postedDate;
     
     private String companyLogoUrl;
+    private String companyLogoTheme;
     
     @org.springframework.data.annotation.Transient
     private Double matchScore;

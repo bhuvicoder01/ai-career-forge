@@ -17,6 +17,7 @@ interface Job {
   matchScore: number;
   url?: string;
   companyLogoUrl?: string;
+  companyLogoTheme?: string;
 }
 
 export default function JobsPage() {
@@ -185,27 +186,32 @@ export default function JobsPage() {
                 {Math.round(job.matchScore)}% Match
               </div>
 
-              <div className="flex items-center gap-4">
-                <div className="flex-shrink-0 h-12 w-auto min-w-[48px] max-w-[140px] bg-white rounded-lg border border-border overflow-hidden flex items-center justify-center p-2 shadow-sm">
+              <div className="flex items-start gap-4 min-w-0">
+                <div className={`flex-shrink-0 h-12 w-auto min-w-[45px] max-w-[140px] rounded-lg border overflow-hidden flex items-center justify-center p-0 shadow-sm transition-all duration-500 ${
+                  job.companyLogoTheme === 'light' 
+                    ? 'bg-zinc-900 border-zinc-800' 
+                    : job.companyLogoTheme === 'dark' 
+                      ? 'bg-white border-zinc-200' 
+                      : 'bg-zinc-100 border-zinc-200'
+                }`}>
                   {job.companyLogoUrl ? (
                     <img 
                       src={job.companyLogoUrl} 
                       alt={job.company} 
                       className="w-full h-full object-contain p-2"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = ""; // Clear src to show fallback
+                        (e.target as HTMLImageElement).src = ""; 
                         (e.target as HTMLImageElement).className = "hidden";
                       }}
                     />
                   ) : (
                     <Briefcase className="w-6 h-6 text-muted-foreground opacity-50" />
                   )}
-                  {/* Shadow icon for when img is hidden or missing */}
                   <Briefcase className="absolute w-6 h-6 text-muted-foreground opacity-50 pointer-events-none -z-10" />
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-xl font-bold leading-tight pr-12">{job.title}</h3>
-                  <p className="text-muted-foreground font-medium text-sm">{job.company}</p>
+                <div className="space-y-1 min-w-0 flex-1">
+                  <h3 className="text-xl font-bold leading-tight pr-12 truncate group-hover:whitespace-normal group-hover:line-clamp-2 transition-all" title={job.title}>{job.title}</h3>
+                  <p className="text-muted-foreground font-medium text-sm truncate" title={job.company}>{job.company}</p>
                 </div>
               </div>
 

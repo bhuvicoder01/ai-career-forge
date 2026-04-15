@@ -62,8 +62,10 @@ public class JobService {
             if (!jobRepository.existsBySourceJobId(job.getSourceJobId())) {
                  try {
                      job.setCultureAnalysis(companyIntelligenceService.fetchCultureInsights(job.getCompany(), job.getTitle()));
-                     job.setCompanyLogoUrl(companyIntelligenceService.findCompanyLogoUrl(job.getCompany()));
-                     log.debug("Enriched job with culture insights and logo for {}", job.getCompany());
+                     CompanyIntelligenceService.LogoMetaData logoMeta = companyIntelligenceService.findCompanyLogoUrl(job.getCompany());
+                     job.setCompanyLogoUrl(logoMeta.url());
+                     job.setCompanyLogoTheme(logoMeta.theme());
+                     log.debug("Enriched job with culture insights and theme-aware logo for {}", job.getCompany());
                  } catch (Exception e) {
                      log.error("Failed to enrich job with culture insights/logo: {}", e.getMessage());
                  }

@@ -81,6 +81,9 @@ adzuna:
 app:
   frontend-url: ${FRONTEND_URL:https://ai-career-forge-sable.vercel.app}
 
+logo:
+  dev: ${LOGO_DEV_TOKEN}
+
 logging:
   level:
     root: WARN

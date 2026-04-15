@@ -26,6 +26,7 @@ interface Job {
   fairPayEstimate?: string;
   relevanceExplanation?: string;
   companyLogoUrl?: string;
+  companyLogoTheme?: string;
 }
 
 interface JobDetailResponse {
@@ -118,7 +119,13 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
             <div className="relative flex flex-col md:flex-row gap-8 items-start justify-between">
               <div className="space-y-6 flex-1">
                 <div className="flex items-center gap-6">
-                  <div className="h-20 w-auto min-w-[80px] max-w-[240px] bg-white rounded-2xl flex items-center justify-center border border-border shadow-2xl overflow-hidden relative p-4">
+                  <div className={`h-22 w-auto min-w-[180px] max-w-[260px] rounded-3xl flex items-center justify-center border shadow-2xl overflow-hidden relative p-5 transition-all duration-700 ${
+                    job.companyLogoTheme === 'light' 
+                      ? 'bg-zinc-900 border-zinc-800 shadow-zinc-900/40' 
+                      : job.companyLogoTheme === 'dark' 
+                        ? 'bg-white border-zinc-200 shadow-black/5' 
+                        : 'bg-zinc-100 border-zinc-200'
+                  }`}>
                     {job.companyLogoUrl ? (
                       <img 
                         src={job.companyLogoUrl} 
