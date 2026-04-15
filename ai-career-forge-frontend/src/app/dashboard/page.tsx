@@ -16,6 +16,7 @@ export default function DashboardProfile() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "success" | "error">("idle");
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -34,10 +35,7 @@ export default function DashboardProfile() {
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const uploadFile = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
 
@@ -60,10 +58,35 @@ export default function DashboardProfile() {
     }
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) uploadFile(file);
+  };
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const onDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === "application/pdf") {
+      uploadFile(file);
+    } else {
+      alert("Please upload a PDF file.");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -71,12 +94,19 @@ export default function DashboardProfile() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Your Profile</h1>
-        <p className="text-muted-foreground">AI automates your data to customize your opportunities.</p>
+        <h1 className="text-3xl md:text-5xl font-black tracking-tight text-foreground">Mission Profile</h1>
+        <p className="text-muted-foreground font-semibold">AI automates your data to customize your opportunities.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-card border border-border rounded-xl p-6 flex flex-col items-center justify-center text-center space-y-4 border-dashed border-2 bg-muted/20 relative">
+        <div 
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+          className={`bg-card border-2 rounded-2xl p-6 flex flex-col items-center justify-center text-center space-y-4 border-dashed relative overflow-hidden group transition-all ${
+            isDragging ? 'border-foreground bg-foreground/5 scale-[1.02]' : 'border-border bg-muted/10'
+          }`}
+        >
           <input 
             type="file" 
             ref={fileInputRef}
@@ -86,61 +116,66 @@ export default function DashboardProfile() {
           />
           
           {isUploading ? (
-            <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+            <Loader2 className="w-12 h-12 text-muted-foreground animate-spin" />
           ) : uploadStatus === "success" ? (
             <CheckCircle2 className="w-12 h-12 text-green-500" />
           ) : (
-            <UploadCloud className="w-12 h-12 text-blue-500" />
+            <UploadCloud className={`w-12 h-12 transition-transform ${isDragging ? 'scale-125 text-foreground' : 'text-muted-foreground group-hover:scale-110'}`} />
           )}
 
           <div>
-            <h3 className="text-lg font-medium">
-              {isUploading ? "Processing..." : uploadStatus === "success" ? "Upload Complete!" : "Upload Resume"}
+            <h3 className="text-lg font-black tracking-tighter">
+              {isDragging ? "DROP TO INGEST" : isUploading ? "RECONNAISSANCE..." : uploadStatus === "success" ? "UPLOAD SECURED" : "UPLOAD RESUME"}
             </h3>
-            <p className="text-sm text-muted-foreground max-w-[250px] mt-1">
-              {uploadStatus === "error" ? "Upload failed. Please try again." : "Drag & drop your PDF here. The AI will extract all skills and experience instantly."}
+            <p className="text-xs text-muted-foreground max-w-[250px] mt-1 font-bold">
+              {isDragging ? "Release to begin AI extraction" : uploadStatus === "error" ? "Transmission failed. Retry." : "Drag & drop your PDF. AI extraction engaged."}
             </p>
           </div>
           
           <button 
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="px-4 py-2 mt-2 font-medium rounded-lg bg-primary text-primary-foreground text-sm hover:opacity-90 disabled:opacity-50"
+            className="px-6 py-2.5 mt-2 font-black rounded-xl bg-foreground text-background text-sm hover:opacity-90 disabled:opacity-50 transition-all shadow-lg active:scale-95"
           >
-            {isUploading ? "Uploading..." : "Select File"}
+            {isUploading ? "UPLOADING..." : "SELECT FILE"}
           </button>
 
           {profile?.resumeS3Url && (
-            <div className="mt-4 text-xs text-blue-400 bg-blue-500/10 px-2 py-1 rounded truncate max-w-full">
-              Current: {profile.resumeS3Url.split('/').pop()}
+            <div className="mt-4 text-[10px] text-muted-foreground bg-secondary px-3 py-1.5 rounded-lg truncate max-w-full border border-border font-mono">
+              FILE: {profile.resumeS3Url.split('/').pop()}
             </div>
+          )}
+
+          {/* Drag Overlay Effect */}
+          {isDragging && (
+            <div className="absolute inset-0 bg-foreground/5 pointer-events-none animate-pulse" />
           )}
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-            <BrainCircuit className="text-purple-400 w-5 h-5" /> 
-            Extracted Intelligence
+        <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col">
+          <h3 className="text-lg font-black flex items-center gap-2 mb-6 uppercase tracking-widest text-foreground/70">
+            <BrainCircuit className="text-foreground/40 w-5 h-5" /> 
+            Extracted Intel
           </h3>
-          <div className="space-y-4">
+          <div className="space-y-6 flex-1">
             <div>
-              <span className="text-sm text-muted-foreground">Top Skills</span>
-              <div className="flex flex-wrap gap-2 mt-1">
+              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Top Competencies</span>
+              <div className="flex flex-wrap gap-2 mt-3">
                 {profile?.skills && profile.skills.length > 0 ? (
                   profile.skills.map(s => (
-                    <span key={s} className="px-2 py-1 text-xs rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    <span key={s} className="px-3 py-1.5 text-[11px] rounded-lg bg-secondary text-foreground border border-border font-black uppercase shadow-sm">
                       {s}
                     </span>
                   ))
                 ) : (
-                  <span className="text-xs text-muted-foreground italic">No skills extracted yet. Upload a resume to begin.</span>
+                  <span className="text-xs text-muted-foreground italic">No skills extracted. Awaiting resume transmission.</span>
                 )}
               </div>
             </div>
-            <div>
-              <span className="text-sm text-muted-foreground">Goals</span>
-              <p className="text-sm mt-1">
-                {profile?.parsedGoals || "Upload a resume or update your profile to see AI-generated goals."}
+            <div className="pt-6 border-t border-border/50">
+              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Mission Objectives</span>
+              <p className="text-sm mt-3 text-foreground/80 leading-relaxed font-medium">
+                {profile?.parsedGoals || "Upload a resume to initialize AI-generated objectives."}
               </p>
             </div>
           </div>

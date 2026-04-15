@@ -82,7 +82,7 @@ export default function ApplicationTracker() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-         <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+         <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
       </div>
     );
   }
@@ -91,17 +91,17 @@ export default function ApplicationTracker() {
     <div className="space-y-10 animate-in fade-in duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
-          <h1 className="text-2xl md:text-4xl font-black text-white tracking-tight">Application Arsenal</h1>
-          <p className="text-sm md:text-base text-slate-400 font-medium">Manage your agent-generated materials and track your mission progress.</p>
+          <h1 className="text-2xl md:text-5xl font-black text-foreground tracking-tight">Application Arsenal</h1>
+          <p className="text-sm md:text-base text-muted-foreground font-semibold">Manage your agent-generated materials and track your mission progress.</p>
         </div>
         
         <div className="flex items-center gap-4">
            {/* Tabs */}
-           <div className="flex p-1 bg-slate-900/80 border border-white/10 rounded-2xl">
+           <div className="flex p-1 bg-secondary border border-border rounded-2xl">
               <button 
                 onClick={() => setCurrentTab('ACTIVE')}
                 className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${
-                  currentTab === 'ACTIVE' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-400 hover:text-white'
+                  currentTab === 'ACTIVE' ? 'bg-foreground text-background shadow-lg' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                   <Activity className="w-4 h-4" /> Active Bids
@@ -109,18 +109,18 @@ export default function ApplicationTracker() {
               <button 
                 onClick={() => setCurrentTab('ARCHIVED')}
                 className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${
-                  currentTab === 'ARCHIVED' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
+                  currentTab === 'ARCHIVED' ? 'bg-foreground text-background shadow-lg' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                   <Inbox className="w-4 h-4" /> Archived
               </button>
            </div>
 
-           <div className="hidden xl:flex bg-slate-900/50 border border-white/10 px-6 py-3 rounded-2xl items-center gap-3">
-              <TrendingUp className="w-5 h-5 text-green-400" />
+           <div className="hidden xl:flex bg-card border border-border px-6 py-3 rounded-2xl items-center gap-3 shadow-sm">
+              <TrendingUp className="w-5 h-5 text-muted-foreground" />
               <div>
-                <div className="text-xs font-bold text-slate-500 uppercase">Live Operations</div>
-                <div className="text-xl font-black text-white">{apps.filter(a => a.status === 'APPLIED' || a.status === 'INTERVIEW').length}</div>
+                <div className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">Live Operations</div>
+                <div className="text-xl font-black text-foreground">{apps.filter(a => a.status === 'APPLIED' || a.status === 'INTERVIEW').length}</div>
               </div>
            </div>
         </div>
@@ -129,33 +129,33 @@ export default function ApplicationTracker() {
       <div className="grid grid-cols-1 gap-4 md:gap-6">
         {filteredApps.length > 0 ? (
           filteredApps.map((app) => (
-            <div key={app.id} className="group bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-2xl md:rounded-3xl p-4 md:p-8 hover:bg-slate-900 transition-all border-l-4 border-l-blue-600 relative overflow-hidden">
+            <div key={app.id} className="group bg-card backdrop-blur-md border border-border rounded-2xl md:rounded-3xl p-4 md:p-8 hover:shadow-xl transition-all border-l-4 border-l-foreground relative overflow-hidden">
               <div className="flex flex-col xl:flex-row gap-8 items-start xl:items-center justify-between relative z-10">
                 
                 {/* Job Info */}
                 <div className="flex items-start gap-4 md:gap-6">
-                  <div className="p-3 md:p-5 bg-blue-600/10 text-blue-400 rounded-xl md:rounded-2xl border border-blue-500/20 shadow-inner">
+                  <div className="p-3 md:p-5 bg-muted text-foreground/50 rounded-xl md:rounded-2xl border border-border">
                     <Briefcase className="w-5 h-5 md:w-8 md:h-8" />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-lg md:text-2xl font-black text-white">{app.jobTitle}</h3>
-                    <p className="text-sm md:text-lg text-slate-400 font-semibold">{app.company}</p>
+                    <h3 className="text-lg md:text-3xl font-black text-foreground tracking-tighter">{app.jobTitle}</h3>
+                    <p className="text-sm md:text-xl text-muted-foreground font-bold">{app.company}</p>
                     
                     <div className="flex flex-wrap items-center gap-4 mt-4">
-                       <span className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black border tracking-wider ${
-                         app.status === 'OFFER' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                         app.status === 'INTERVIEW' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-                         app.status === 'REJECTED' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                         'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                       <span className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] md:text-xs font-black border tracking-wider ${
+                         app.status === 'OFFER' ? 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' :
+                         app.status === 'INTERVIEW' ? 'bg-foreground/5 text-foreground/80 border-border' :
+                         app.status === 'REJECTED' ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' :
+                         'bg-secondary text-muted-foreground border-border'
                        }`}>
                           <div className={`w-2 h-2 rounded-full ${
                              app.status === 'OFFER' ? 'bg-green-500' :
                              app.status === 'REJECTED' ? 'bg-red-500' :
-                             'bg-blue-500 animate-pulse'
+                             'bg-foreground animate-pulse'
                           }`}></div>
                           {app.status}
                        </span>
-                       <span className="text-xs text-slate-500 flex items-center gap-1 font-medium">
+                       <span className="text-xs text-muted-foreground flex items-center gap-1 font-bold">
                           <Clock className="w-3.5 h-3.5" />
                           {new Date(app.appliedDate).toLocaleDateString()}
                        </span>
@@ -164,7 +164,7 @@ export default function ApplicationTracker() {
                 </div>
 
                 {/* Status Stepper */}
-                <div className="flex flex-wrap items-center gap-2 bg-black/20 p-1.5 md:p-2 rounded-xl md:rounded-2xl border border-white/5">
+                <div className="flex flex-wrap items-center gap-2 bg-muted p-1.5 md:p-2 rounded-xl md:rounded-2xl border border-border shadow-inner">
                    {['SAVED', 'APPLIED', 'INTERVIEW', 'OFFER', 'REJECTED'].map((st) => (
                      <button
                        key={st}
@@ -172,8 +172,8 @@ export default function ApplicationTracker() {
                        disabled={updatingId === app.id}
                        className={`px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black transition-all ${
                          app.status === st 
-                           ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 scale-105' 
-                           : 'hover:bg-white/5 text-slate-500'
+                           ? 'bg-foreground text-background shadow-lg scale-105' 
+                           : 'hover:bg-foreground/5 text-muted-foreground hover:text-foreground'
                        }`}
                      >
                        {st}
@@ -183,12 +183,12 @@ export default function ApplicationTracker() {
 
                 {/* Actions */}
                 <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-                   <div className="flex gap-2 mr-2 border-r border-white/10 pr-4">
+                   <div className="flex gap-2 mr-2 border-r border-border pr-4">
                        {app.status !== 'ARCHIVED' && (
                            <button 
                                onClick={() => handleArchive(app.id)}
                                title="Archive Application"
-                               className="p-3 bg-white/5 border border-white/10 text-slate-400 rounded-2xl hover:bg-white/10 hover:text-white transition-all"
+                               className="p-3 bg-secondary border border-border text-muted-foreground rounded-2xl hover:bg-foreground hover:text-background transition-all shadow-sm"
                            >
                                <Archive className="w-5 h-5" />
                            </button>
@@ -196,7 +196,7 @@ export default function ApplicationTracker() {
                        <button 
                            onClick={() => handleDelete(app.id)}
                            title="Permanent Delete"
-                           className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all"
+                           className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
                        >
                            <Trash2 className="w-5 h-5" />
                        </button>
@@ -205,36 +205,36 @@ export default function ApplicationTracker() {
                    <a 
                      href={app.tailoredResumeS3Url}
                      target="_blank"
-                     className="flex-1 xl:flex-none flex items-center justify-center gap-2 px-4 py-2.5 md:px-6 md:py-3 bg-white text-black rounded-xl md:rounded-2xl text-xs md:text-sm font-black hover:bg-slate-200 transition-all shadow-xl shadow-white/5"
+                     className="flex-1 xl:flex-none flex items-center justify-center gap-2 px-4 py-2.5 md:px-6 md:py-3 bg-secondary text-foreground hover:bg-foreground hover:text-background border border-border rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all shadow-sm"
                    >
-                     <Eye className="w-4 h-4" /> <span className="hidden xs:inline">Preview</span> Resume
+                     <Eye className="w-4 h-4" /> PREVIEW
                    </a>
                    <Link
                      href={`/dashboard/applications/${app.id}/prep`}
-                     className="flex-1 xl:flex-none flex items-center justify-center gap-2 px-4 py-2.5 md:px-6 md:py-3 bg-blue-600 text-white rounded-xl md:rounded-2xl text-xs md:text-sm font-black hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/10"
+                     className="flex-1 xl:flex-none flex items-center justify-center gap-2 px-4 py-2.5 md:px-6 md:py-3 bg-foreground text-background rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-foreground/90 transition-all shadow-xl"
                    >
-                     <LayoutDashboard className="w-4 h-4" /> <span className="hidden xs:inline">Prep</span> Kit
+                     <LayoutDashboard className="w-4 h-4" /> PREP KIT
                    </Link>
                 </div>
               </div>
               
               {/* Progress Line Background */}
-              <div className="absolute bottom-0 left-0 w-full h-[2px] bg-slate-800">
-                 <div className="h-full bg-blue-600 transition-all duration-1000" style={{ width: app.status === 'OFFER' ? '100%' : app.status === 'INTERVIEW' ? '60%' : app.status === 'APPLIED' ? '30%' : '10%' }}></div>
+              <div className="absolute bottom-0 left-0 w-full h-[3px] bg-muted">
+                 <div className="h-full bg-foreground transition-all duration-1000 shadow-[0_0_10px_rgba(255,255,255,0.5)]" style={{ width: app.status === 'OFFER' ? '100%' : app.status === 'INTERVIEW' ? '60%' : app.status === 'APPLIED' ? '30%' : '10%' }}></div>
               </div>
             </div>
           ))
         ) : (
-          <div className="py-24 text-center border-2 border-dashed border-white/5 rounded-3xl space-y-4">
-             <div className="bg-slate-900 w-20 h-20 rounded-full flex items-center justify-center mx-auto border border-white/10">
-                <AlertCircle className="w-10 h-10 text-slate-700" />
+          <div className="py-24 text-center border-2 border-dashed border-border rounded-3xl space-y-4 bg-muted/20">
+             <div className="bg-secondary w-20 h-20 rounded-full flex items-center justify-center mx-auto border border-border">
+                <AlertCircle className="w-10 h-10 text-muted-foreground" />
              </div>
              <div>
-                <h3 className="text-2xl font-bold text-white">No applications yet</h3>
-                <p className="text-slate-500">Find a job match and use One-Click tailoring to start your arsenal.</p>
+                <h3 className="text-2xl font-black text-foreground uppercase tracking-tighter">No Applications Initialize</h3>
+                <p className="text-muted-foreground font-medium">Find a job match and use One-Click tailoring to start your arsenal.</p>
              </div>
-             <Link href="/dashboard/jobs" className="inline-block px-8 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-500 transition-all">
-                Browse Job Matches
+             <Link href="/dashboard/jobs" className="inline-block px-12 py-4 bg-foreground text-background rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-foreground/90 transition-all shadow-2xl">
+                Browse intelligence
              </Link>
           </div>
         )}

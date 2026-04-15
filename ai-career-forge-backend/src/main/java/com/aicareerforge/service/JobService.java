@@ -18,6 +18,8 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -28,6 +30,9 @@ public class JobService {
     private final JobRecommendationAgent recommendationAgent;
     private final AdzunaClient adzunaClient;
     private final CompanyIntelligenceService companyIntelligenceService;
+    
+    // User ID -> (Job ID -> Score)
+    private final Map<String, Map<String, Double>> scoreCache = new ConcurrentHashMap<>();
 
     public Page<Job> getJobs(int page, int size) {
         return jobRepository.findAll(PageRequest.of(page, size));
@@ -57,9 +62,10 @@ public class JobService {
             if (!jobRepository.existsBySourceJobId(job.getSourceJobId())) {
                  try {
                      job.setCultureAnalysis(companyIntelligenceService.fetchCultureInsights(job.getCompany(), job.getTitle()));
-                     log.debug("Enriched job with culture insights for {}", job.getCompany());
+                     job.setCompanyLogoUrl(companyIntelligenceService.findCompanyLogoUrl(job.getCompany()));
+                     log.debug("Enriched job with culture insights and logo for {}", job.getCompany());
                  } catch (Exception e) {
-                     log.error("Failed to enrich job with culture insights: {}", e.getMessage());
+                     log.error("Failed to enrich job with culture insights/logo: {}", e.getMessage());
                  }
             }
 
@@ -108,37 +114,26 @@ public class JobService {
                         // --- Multi-factor Match Score (65-100 range) ---
                         double baseScore = 70.0;
 
-                        // Factor 1: Vector similarity (from embedding search)
+                        // Use extracted scoring logic
+                        Double vectorSimilarity = 0.0;
                         Object distance = doc.getMetadata().get("distance");
                         if (distance instanceof Double d) {
-                            // distance 0 = perfect match, 1 = no match
-                            // Map to 0-15 point bonus
-                            baseScore += (1.0 - d) * 15.0;
+                            vectorSimilarity = 1.0 - d;
                         } else {
-                            Object score = doc.getMetadata().get("score");
-                            if (score instanceof Double s) {
-                                baseScore += s * 15.0;
+                            Object scoreObj = doc.getMetadata().get("score");
+                            if (scoreObj instanceof Double s) {
+                                vectorSimilarity = s;
                             }
                         }
-
-                        // Factor 2: Skill overlap bonus (0-10 points)
-                        if (profile.getSkills() != null && job.getDescription() != null) {
-                            String descLower = job.getDescription().toLowerCase();
-                            long matchedCount = profile.getSkills().stream()
-                                    .filter(skill -> skill.length() > 2 && descLower.contains(skill.toLowerCase()))
-                                    .count();
-                            double skillBonus = Math.min(matchedCount * 2.0, 10.0);
-                            baseScore += skillBonus;
+                        
+                        Double finalScore = calculateMatchScore(job, profile, vectorSimilarity);
+                        job.setMatchScore(finalScore);
+                        
+                        // Cache the score for consistency across individual job views
+                        if (profile.getUserId() != null) {
+                            scoreCache.computeIfAbsent(profile.getUserId(), k -> new ConcurrentHashMap<>())
+                                      .put(job.getId(), finalScore);
                         }
-
-                        // Factor 3: Experience alignment bonus (0-5 points)
-                        if (totalExperienceYears > 0 && job.getDescription() != null) {
-                            baseScore += calculateExperienceBonus(job.getDescription(), totalExperienceYears);
-                        }
-
-                        // Clamp score between 65 and 100
-                        baseScore = Math.max(65.0, Math.min(100.0, baseScore));
-                        job.setMatchScore(Math.round(baseScore * 10.0) / 10.0); // 1 decimal place
                         
                         // Only generate explanation if not already cached
                         if (job.getRelevanceExplanation() == null || job.getRelevanceExplanation().isBlank()) {
@@ -157,6 +152,44 @@ public class JobService {
                 .filter(Objects::nonNull)
                 .sorted((a, b) -> Double.compare(b.getMatchScore(), a.getMatchScore()))
                 .collect(Collectors.toList());
+    }
+
+    public double calculateMatchScore(Job job, UserProfile profile, Double vectorSimilarity) {
+        if (job == null || profile == null) return 70.0;
+        
+        double baseScore = 70.0;
+
+        // Factor 1: Vector similarity (0-15 points)
+        if (vectorSimilarity != null) {
+            baseScore += vectorSimilarity * 15.0;
+        }
+
+        // Factor 2: Skill overlap bonus (0-10 points)
+        if (profile.getSkills() != null && job.getDescription() != null) {
+            String descLower = job.getDescription().toLowerCase();
+            long matchedCount = profile.getSkills().stream()
+                    .filter(skill -> skill.length() > 2 && descLower.contains(skill.toLowerCase()))
+                    .count();
+            double skillBonus = Math.min(matchedCount * 2.0, 10.0);
+            baseScore += skillBonus;
+        }
+
+        // Factor 3: Experience alignment bonus (0-5 points)
+        int totalExperienceYears = estimateExperienceYears(profile);
+        if (totalExperienceYears > 0 && job.getDescription() != null) {
+            double expBonus = calculateExperienceBonus(job.getDescription(), totalExperienceYears);
+            baseScore += expBonus;
+        }
+
+        // Clamp score between 65 and 100
+        baseScore = Math.max(65.0, Math.min(100.0, baseScore));
+        return Math.round(baseScore * 10.0) / 10.0; // 1 decimal place
+    }
+
+    public Double getCachedScore(String userId, String jobId) {
+        if (userId == null || jobId == null) return null;
+        Map<String, Double> userScores = scoreCache.get(userId);
+        return (userScores != null) ? userScores.get(jobId) : null;
     }
 
     /**

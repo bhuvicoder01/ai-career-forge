@@ -3,11 +3,14 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import AuthGuard from '@/components/AuthGuard'
 
+import { ThemeProvider } from '@/components/ThemeProvider'
+import ThemeToggle from '@/components/ThemeToggle'
+
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'AI CareerForge',
-  description: 'AI-Powered Application Accelerator',
+  title: 'ZENITH | AI Career Orchestrator',
+  description: 'Next-Gen Agentic Application Intelligence',
 }
 
 export default function RootLayout({
@@ -16,11 +19,19 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <AuthGuard>
-          {children}
-        </AuthGuard>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthGuard>
+            {children}
+            <ThemeToggle />
+          </AuthGuard>
+        </ThemeProvider>
       </body>
     </html>
   )

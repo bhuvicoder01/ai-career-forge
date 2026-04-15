@@ -38,6 +38,8 @@ public class Job {
     private Double salaryMax;
     private LocalDateTime postedDate;
     
+    private String companyLogoUrl;
+    
     @org.springframework.data.annotation.Transient
     private Double matchScore;
 }

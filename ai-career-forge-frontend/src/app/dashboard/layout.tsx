@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { User, Briefcase, FileText, CheckCircle, LogOut, Menu, X } from "lucide-react";
+import { 
+  User, Briefcase, FileText, CheckCircle, LogOut, Menu, X,
+  LayoutDashboard, ClipboardList, BrainCircuit, Loader2, Sun, Moon, TrendingUp 
+} from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import useAuthStore from "@/store/useAuthStore";
@@ -10,7 +13,8 @@ import AuthGuard from "@/components/AuthGuard";
 import FloatingAiAssistant from "@/components/FloatingAiAssistant";
 import useSyncStore from "@/store/useSyncStore";
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useTheme } from "next-themes";
+import api from "@/lib/api";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -19,10 +23,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [apps, setApps] = useState<any[]>([]);
 
   // Global SSE connection for sync status
   const { syncStatus, connect, disconnect } = useSyncStore();
   const isSyncing = syncStatus.status === 'SYNCING';
+
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  // Avoid hydration mismatch and fetch data
+  useEffect(() => {
+    setMounted(true);
+    fetchApps();
+  }, []);
+
+  const fetchApps = async () => {
+    try {
+      const res = await api.get("/applications");
+      setApps(res.data);
+    } catch (err) {
+      console.error("DashboardLayout: Failed to fetch apps:", err);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -62,10 +85,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Desktop Sidebar / Mobile Top Bar */}
         <nav className={`flex navbar ${isMobile ? 'flex-row items-center px-4 py-2 w-full border-b' : 'flex-col border-r'} justify-between bg-card border-border`}>
           
-          <div className="flex items-center justify-between w-full md:w-auto">
-            <Link href="/" className="flex nav-logo items-center gap-3 hover:opacity-80 transition-opacity">
-              <Image src="/logo-transparent.png" alt="CareerForge Logo" width={48} height={48} className="object-contain" />
-              <div className="font-bold text-xl tracking-tighter text-blue-400">CareerForge</div>
+          <div className={`flex items-center justify-center w-full md:w-auto ${!isMobile ? 'pt-10 px-8 pb-4' : ''}`}>
+            <Link href="/" className="flex nav-logo items-center gap-3 hover:opacity-80 transition-opacity group">
+              <div className="w-full max-w-[120px] group-hover:scale-105 transition-transform duration-500">
+                <Image 
+                  src={mounted && resolvedTheme === 'dark' ? "/zenith-dark.png" : "/zenith-light.png"} 
+                  alt="Zenith" 
+                  width={100} 
+                  height={38} 
+                  className="object-contain" 
+                />
+              </div>
             </Link>
 
             {isMobile && (
@@ -80,29 +110,40 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           {!isMobile && (
-            <div className="flex flex-col flex-1 mt-8 space-y-2 nav-links">
+            <div className="flex flex-col flex-1 mt-10 space-y-3 nav-links px-2">
               {navLinks.map((link) => (
                 <Link 
                   key={link.href}
                   href={link.href} 
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors font-medium ${
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold border ${
                     pathname === link.href 
-                      ? "bg-secondary text-blue-400" 
-                      : "hover:bg-secondary/50 text-secondary-foreground/70 hover:text-secondary-foreground"
+                      ? "bg-foreground text-background border-transparent shadow-lg" 
+                      : "hover:bg-secondary/80 text-muted-foreground hover:text-foreground border-transparent"
                   }`}
                 >
                   <link.icon className="w-5 h-5" /> {link.label}
                 </Link>
               ))}
               
-              <button 
-                onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-red-500/10 text-red-500 font-medium transition-colors mt-auto mb-4"
-              >
-                <LogOut className="w-5 h-5" /> Logout
-              </button>
+              <div className="mt-auto space-y-4 pt-6 border-t border-border/50">
+                <div className="flex items-center gap-3">
+                    <TrendingUp className="w-5 h-5 text-muted-foreground" />
+                    <div>
+                        <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Active Ops</div>
+                        <div className="text-xl font-black text-foreground">{apps.filter(a => a.status === 'APPLIED' || a.status === 'INTERVIEW').length}</div>
+                    </div>
+                </div>
+                
+                <button 
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-destructive/10 text-destructive font-bold transition-colors"
+                >
+                  <LogOut className="w-5 h-5" /> Logout
+                </button>
+              </div>
             </div>
           )}
+
         </nav>
 
         {/* Mobile Sidebar Overlay */}
@@ -119,35 +160,39 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               }`}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center gap-3 mb-8">
-                <Image src="/logo-transparent.png" alt="Logo" width={40} height={40} />
-                <span className="font-bold text-lg text-blue-400">CareerForge</span>
-              </div>
+                  <Image 
+                    src={mounted && resolvedTheme === 'dark' ? "/zenith-dark.png" : "/zenith-light.png"} 
+                    alt="Zenith" 
+                    width={100} 
+                    height={38} 
+                    className="object-contain" 
+                  />
 
-              <div className="flex flex-col space-y-3">
+              <div className="flex flex-col space-y-4">
                 {navLinks.map((link) => (
                   <Link 
                     key={link.href}
                     href={link.href} 
-                    className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all font-medium ${
+                    className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold border ${
                       pathname === link.href 
-                        ? "bg-blue-500/20 text-blue-400" 
-                        : "hover:bg-white/10 text-secondary-foreground/70"
+                        ? "bg-foreground text-background border-transparent shadow-lg" 
+                        : "hover:bg-white/5 text-secondary-foreground/70 border-transparent"
                     }`}
                   >
-                    <link.icon className="w-5 h-5" /> {link.label}
+                    <link.icon className="w-6 h-6" /> {link.label}
                   </Link>
                 ))}
               </div>
 
-              <div className="mt-auto pt-6 border-t border-white/10">
+              <div className="mt-auto pt-6 border-t border-white/10 flex flex-col gap-4">
                 <button 
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-red-500/10 text-red-500 font-medium transition-colors"
+                  className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-red-500/10 text-red-500 font-medium transition-colors"
                 >
-                  <LogOut className="w-5 h-5" /> Logout
+                  <LogOut className="w-6 h-6" /> Logout
                 </button>
               </div>
+
             </div>
           </div>
         )}
@@ -155,15 +200,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <main className={`flex-1 bg-background ${isMobile ? 'p-4' : 'p-8'} overflow-y-auto w-full`}>
           {/* Global sync status indicator */}
           {isSyncing && (
-            <div className="mb-6 flex items-center gap-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 px-5 py-3 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="mb-6 flex items-center gap-3 bg-secondary border border-border text-foreground px-5 py-3 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm">
               <Loader2 className="w-5 h-5 animate-spin" />
               <div className="flex-1">
-                <p className="text-sm font-bold">Background Job Sync</p>
-                <p className="text-xs text-blue-400/70">
+                <p className="text-sm font-black">Agent Synchronization</p>
+                <p className="text-xs text-muted-foreground">
                   Syncing {syncStatus.currentSkill || 'roles'}... ({syncStatus.progress}/{syncStatus.total})
                 </p>
               </div>
-              <div className="text-xs font-mono bg-blue-500/20 px-2 py-1 rounded-lg">
+              <div className="text-xs font-mono bg-foreground/5 px-2 py-1 rounded-lg border border-border">
                 {syncStatus.progress}/{syncStatus.total}
               </div>
             </div>

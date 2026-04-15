@@ -16,6 +16,7 @@ interface Job {
   salaryMax: number;
   matchScore: number;
   url?: string;
+  companyLogoUrl?: string;
 }
 
 export default function JobsPage() {
@@ -114,11 +115,11 @@ export default function JobsPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-card/30 p-6 rounded-2xl border border-border/50 shadow-sm">
-        <div className="space-y-2">
-          <h1 className="text-4xl font-extrabold tracking-tight text-foreground">Job Recommendations</h1>
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-card p-8 rounded-3xl border border-border shadow-sm">
+        <div className="space-y-1">
+          <h1 className="text-3xl md:text-5xl font-black tracking-tight text-foreground">Job Discovery</h1>
           <p className="text-muted-foreground font-medium max-w-lg">
-            AI-powered matches curated specifically for your profile and career growth.
+            AI-powered semantic matches curated specifically for your profile.
           </p>
         </div>
 
@@ -130,7 +131,7 @@ export default function JobsPage() {
               placeholder="Skill or Title (e.g. Java)"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
             />
           </div>
           <div className="flex-1 lg:w-48 xl:w-56">
@@ -139,7 +140,7 @@ export default function JobsPage() {
               placeholder="Where (e.g. London)"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="w-full bg-background/50 border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
             />
           </div>
           <div className="flex gap-2">
@@ -177,16 +178,35 @@ export default function JobsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {jobs.length > 0 ? (
           jobs.map((job) => (
-            <div key={job.id} className="group relative bg-card border border-border rounded-xl p-6 hover:shadow-lg hover:shadow-primary/5 transition-all flex flex-col gap-4">
+            <div key={job.id} className="group relative bg-card border border-border rounded-2xl p-8 hover:shadow-2xl hover:shadow-primary/5 transition-all flex flex-col gap-5">
               {/* Match Score Badge */}
-              <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-semibold border border-primary/20">
-                <Star className="w-4 h-4 fill-primary" />
+              <div className="absolute top-4 right-4 flex items-center gap-1.5 px-4 py-1.5 bg-foreground text-background rounded-full text-[10px] font-black uppercase tracking-widest border border-transparent shadow-lg">
+                <Star className="w-3.5 h-3.5 fill-current" />
                 {Math.round(job.matchScore)}% Match
               </div>
 
-              <div className="space-y-1">
-                <h3 className="text-xl font-bold leading-none pr-20">{job.title}</h3>
-                <p className="text-muted-foreground font-medium">{job.company}</p>
+              <div className="flex items-center gap-4">
+                <div className="flex-shrink-0 h-12 w-auto min-w-[48px] max-w-[140px] bg-white rounded-lg border border-border overflow-hidden flex items-center justify-center p-2 shadow-sm">
+                  {job.companyLogoUrl ? (
+                    <img 
+                      src={job.companyLogoUrl} 
+                      alt={job.company} 
+                      className="w-full h-full object-contain p-2"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = ""; // Clear src to show fallback
+                        (e.target as HTMLImageElement).className = "hidden";
+                      }}
+                    />
+                  ) : (
+                    <Briefcase className="w-6 h-6 text-muted-foreground opacity-50" />
+                  )}
+                  {/* Shadow icon for when img is hidden or missing */}
+                  <Briefcase className="absolute w-6 h-6 text-muted-foreground opacity-50 pointer-events-none -z-10" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-xl font-bold leading-tight pr-12">{job.title}</h3>
+                  <p className="text-muted-foreground font-medium text-sm">{job.company}</p>
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">

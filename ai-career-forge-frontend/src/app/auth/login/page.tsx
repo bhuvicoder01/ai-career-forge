@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { BrainCircuit } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import api from "@/lib/api";
 import useAuthStore from "@/store/useAuthStore";
 
@@ -12,8 +13,14 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const setAuth = useAuthStore((state) => state.setAuth);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,44 +45,47 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-blue-900/10 rounded-full blur-3xl -z-10" />
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-foreground/5 rounded-full blur-3xl -z-10" />
       
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
-          <Link href="/" className="inline-flex items-center gap-2 font-bold text-2xl text-foreground hover:text-blue-400 transition-colors">
-            <BrainCircuit className="w-8 h-8 text-blue-500" />
-            CareerForge
+          <Link href="/" className="inline-flex items-center justify-center hover:opacity-80 transition-opacity">
+            <img 
+              src={mounted && resolvedTheme === 'dark' ? "/zenith-dark.png" : "/zenith-light.png"} 
+              alt="Zenith" 
+              className="w-full max-w-[150px] h-auto" 
+            />
           </Link>
-          <p className="text-muted-foreground mt-2 text-sm">Sign in to your account</p>
+          <p className="text-muted-foreground mt-2 text-[10px] font-black uppercase tracking-[0.2em]">Access Intelligence Node</p>
         </div>
 
-        <form onSubmit={handleSignIn} className="space-y-4 bg-card p-6 md:p-8 rounded-2xl border border-border/50 shadow-sm">
+        <form onSubmit={handleSignIn} className="space-y-5 bg-card p-6 md:p-10 rounded-3xl border border-border shadow-2xl">
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-lg text-center">
+            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-lg text-center font-bold">
               {error}
             </div>
           )}
           
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">Email address</label>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Email Address</label>
             <input 
               type="email" 
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-border bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-shadow" 
-              placeholder="you@example.com"
+              className="w-full px-4 py-3 border border-border bg-background rounded-xl focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all text-sm font-medium" 
+              placeholder="operator@zenith.ai"
             />
           </div>
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">Password</label>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Password</label>
             <input 
               type="password" 
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-border bg-background rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-shadow" 
+              className="w-full px-4 py-3 border border-border bg-background rounded-xl focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all text-sm font-medium" 
               placeholder="••••••••"
             />
           </div>
@@ -83,13 +93,13 @@ export default function Login() {
           <button 
             type="submit" 
             disabled={isLoading}
-            className="w-full py-2.5 px-4 bg-primary text-primary-foreground font-semibold rounded-lg shadow hover:bg-primary/90 transition-colors mt-2 disabled:opacity-50"
+            className="w-full py-4 px-4 bg-foreground text-background font-black uppercase tracking-[0.2em] text-xs rounded-xl shadow-xl hover:opacity-90 transition-all mt-4 disabled:opacity-50 active:scale-95"
           >
-            {isLoading ? "Signing in..." : "Sign in"}
+            {isLoading ? "Synchronizing..." : "Initialize Session"}
           </button>
           
-          <div className="text-center text-sm text-muted-foreground pt-4">
-            Don't have an account? <Link href="/auth/register" className="text-blue-400 hover:text-blue-300 font-medium">Create one</Link>
+          <div className="text-center text-[10px] font-black uppercase tracking-widest pt-6 border-t border-border/50">
+            <span className="text-muted-foreground">No account?</span> <Link href="/auth/register" className="text-foreground hover:underline ml-1">Create Access</Link>
           </div>
         </form>
       </div>

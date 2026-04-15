@@ -68,7 +68,7 @@ export default function ApplicationMaterialsPage({ params }: { params: Promise<{
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
       </div>
     );
   }
@@ -79,36 +79,36 @@ export default function ApplicationMaterialsPage({ params }: { params: Promise<{
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8 animate-in fade-in duration-500 pb-20">
       <Link 
         href="/dashboard/applications" 
-        className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group"
+        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group font-black uppercase text-[10px] tracking-widest"
       >
-        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-        Back to Tracker
+        <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
+        Back to Arsenal
       </Link>
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6">
          <div className="space-y-1">
-            <h1 className="text-2xl md:text-4xl font-black text-white">{app.jobTitle}</h1>
-            <p className="text-lg md:text-xl text-blue-400 font-bold">{app.company}</p>
+            <h1 className="text-2xl md:text-5xl font-black text-foreground tracking-tighter">{app.jobTitle}</h1>
+            <p className="text-lg md:text-2xl text-muted-foreground font-black uppercase tracking-widest">{app.company}</p>
          </div>
          
          <div className="flex gap-2 md:gap-3 w-full md:w-auto">
             <button 
               onClick={handleDelete}
-              className="flex-1 md:flex-none px-4 md:px-6 py-2.5 md:py-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl md:rounded-2xl font-black text-xs md:text-sm flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all"
+              className="flex-1 md:flex-none px-4 md:px-6 py-2.5 md:py-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl md:rounded-2xl font-black text-xs md:text-sm flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all shadow-sm"
             >
-              <Trash2 className="w-4 h-4" /> <span className="md:inline">Delete</span>
+              <Trash2 className="w-4 h-4" /> DELETE
             </button>
             <a 
               href={app.tailoredResumeS3Url}
               target="_blank"
-              className="flex-1 md:flex-none px-4 md:px-6 py-2.5 md:py-3 bg-white text-black rounded-xl md:rounded-2xl font-black text-xs md:text-sm flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"
+              className="flex-1 md:flex-none px-4 md:px-6 py-2.5 md:py-3 bg-foreground text-background rounded-xl md:rounded-2xl font-black text-xs md:text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-lg"
             >
-              <Download className="w-4 h-4" /> <span className="md:inline">Resume</span>
+              <Download className="w-4 h-4" /> DOWNLOAD
             </a>
          </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5 md:gap-2 bg-slate-900/50 p-1.5 md:p-2 rounded-xl md:rounded-2xl border border-white/10">
+      <div className="flex flex-wrap gap-1.5 md:gap-2 bg-secondary p-1.5 md:p-2 rounded-xl md:rounded-2xl border border-border">
          {[
            { id: 'RESUME', label: 'Resume', icon: FileText },
            { id: 'LETTER', label: 'Cover Letter', icon: Sparkles },
@@ -118,8 +118,8 @@ export default function ApplicationMaterialsPage({ params }: { params: Promise<{
            <button
              key={tab.id}
              onClick={() => setActiveTab(tab.id as any)}
-             className={`flex items-center gap-1.5 md:gap-2 px-3 py-2 md:px-6 md:py-3 rounded-lg md:rounded-xl text-[10px] md:text-sm font-bold transition-all ${
-               activeTab === tab.id ? 'bg-blue-600 text-white' : 'hover:bg-white/5 text-slate-400'
+             className={`flex items-center gap-1.5 md:gap-2 px-3 py-2 md:px-6 md:py-3 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all ${
+               activeTab === tab.id ? 'bg-foreground text-background shadow-lg' : 'hover:bg-foreground/5 text-muted-foreground hover:text-foreground'
              }`}
            >
              <tab.icon className="w-3.5 h-3.5 md:w-4 md:h-4" />
@@ -129,35 +129,37 @@ export default function ApplicationMaterialsPage({ params }: { params: Promise<{
       </div>
 
       {/* Content Area */}
-      <div className="bg-slate-900/40 border border-white/10 rounded-2xl md:rounded-3xl p-4 md:p-12 min-h-[500px]">
+      <div className="bg-card border border-border rounded-3xl md:rounded-3xl p-4 md:p-12 min-h-[500px] shadow-sm overflow-hidden">
          {activeTab === 'RESUME' && (
-           <div className="space-y-8">
+           <div className="space-y-8 animate-in fade-in duration-300">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                 <h2 className="text-2xl font-black flex items-center gap-3">
-                    <FileText className="w-6 h-6 text-blue-400" /> Resume Intelligence
+                 <h2 className="text-xl md:text-3xl font-black flex items-center gap-3 uppercase tracking-tighter">
+                    <FileText className="w-6 h-6 md:w-8 md:h-8 opacity-40" /> Resume Spec
                  </h2>
                  <button 
                    onClick={() => setIsComparing(!isComparing)}
-                   className={`px-4 py-2 rounded-xl text-xs font-black border transition-all ${
-                     isComparing ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
+                   className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                     isComparing 
+                        ? 'bg-foreground border-foreground text-background shadow-lg' 
+                        : 'bg-secondary border-border text-muted-foreground hover:bg-secondary/80'
                    }`}
                  >
-                   {isComparing ? 'Exit Comparison' : 'Side-by-Side Comparison'}
+                   {isComparing ? 'Exit Comparison' : 'Side-by-Side Mode'}
                  </button>
               </div>
               
               <div className={`grid gap-6 ${isComparing ? 'grid-cols-1 xl:grid-cols-2' : 'grid-cols-1'}`}>
                  {isComparing && (
                     <div className="space-y-3">
-                       <p className="text-xs font-bold text-slate-500 uppercase tracking-widest text-center">Original Resume</p>
-                       <div className="aspect-[1/1.414] w-full bg-slate-950 rounded-2xl border border-white/5 overflow-hidden">
-                          <iframe src={profile?.resumeS3Url} className="w-full h-full border-none opacity-60" />
+                       <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] text-center italic">Baseline Record</p>
+                       <div className="aspect-[1/1.414] w-full bg-muted rounded-2xl border border-border overflow-hidden ring-1 ring-border">
+                          <iframe src={profile?.resumeS3Url} className="w-full h-full border-none opacity-40 grayscale" />
                        </div>
                     </div>
                  )}
                  <div className="space-y-3">
-                    <p className="text-xs font-bold text-blue-400 uppercase tracking-widest text-center">{isComparing ? 'AI-Tailored Version' : ''}</p>
-                    <div className="aspect-[1/1.414] w-full bg-white rounded-2xl border border-white/5 overflow-hidden shadow-2xl">
+                    <p className="text-[10px] font-black text-foreground uppercase tracking-[0.2em] text-center">{isComparing ? 'Optimized Intelligence' : ''}</p>
+                    <div className="aspect-[1/1.414] w-full bg-white rounded-2xl border border-border overflow-hidden shadow-2xl relative">
                        <iframe src={app.tailoredResumeS3Url} className="w-full h-full border-none" />
                     </div>
                  </div>
@@ -166,47 +168,45 @@ export default function ApplicationMaterialsPage({ params }: { params: Promise<{
          )}
 
           {activeTab === 'LETTER' && (
-             <div className="space-y-4 md:space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                 <h2 className="text-xl md:text-2xl font-black flex items-center gap-3">
-                    <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-purple-400" /> Cover Letter
+             <div className="space-y-6 md:space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-400">
+                 <h2 className="text-xl md:text-3xl font-black flex items-center gap-3 uppercase tracking-tighter">
+                    <Sparkles className="w-6 h-6 opacity-40" /> Tailored Narrative
                  </h2>
-                 <div className="bg-slate-950/50 border border-white/5 rounded-xl md:rounded-2xl p-6 md:p-10 text-slate-300 leading-relaxed whitespace-pre-wrap font-serif text-base md:text-lg">
+                 <div className="bg-muted/30 border border-border rounded-2xl p-6 md:p-14 text-foreground leading-relaxed whitespace-pre-wrap font-serif text-base md:text-xl shadow-inner relative">
+                    <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles className="w-20 h-20" /></div>
                     {app.coverLetterText}
                  </div>
              </div>
           )}
 
           {activeTab === 'INTRO' && (
-             <div className="space-y-4 md:space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                 <h2 className="text-xl md:text-2xl font-black flex items-center gap-3">
-                    <Mail className="w-5 h-5 md:w-6 md:h-6 text-green-400" /> Email Introduction
+             <div className="space-y-6 md:space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-400">
+                 <h2 className="text-xl md:text-3xl font-black flex items-center gap-3 uppercase tracking-tighter">
+                    <Mail className="w-6 h-6 opacity-40" /> Comms Protocol
                  </h2>
-                 <div className="bg-slate-950/50 border border-white/5 rounded-xl md:rounded-2xl p-5 md:p-8 text-slate-300 leading-relaxed whitespace-pre-wrap font-mono text-xs md:text-sm relative">
-                    <div className="absolute top-2 right-2 text-[8px] text-slate-600 font-bold uppercase tracking-widest md:hidden">Copy</div>
-                    <div className="absolute top-4 right-4 text-[10px] text-slate-600 font-bold uppercase tracking-widest hidden md:block">Copy to Clipboard</div>
+                 <div className="bg-muted border border-border rounded-2xl p-6 md:p-10 text-foreground leading-relaxed whitespace-pre-wrap font-mono text-xs md:text-sm relative shadow-inner">
+                    <div className="absolute top-4 right-4 text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-40">Ready to transmit</div>
                     {app.emailIntroduction}
                  </div>
              </div>
           )}
 
          {activeTab === 'PREP' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <h2 className="text-2xl font-black flex items-center gap-3">
-                   <LayoutDashboard className="w-6 h-6 text-orange-400" /> Complete Interview Preparation Kit
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400">
+                <h2 className="text-2xl md:text-4xl font-black flex items-center gap-3 uppercase tracking-tighter">
+                   <LayoutDashboard className="w-8 h-8 opacity-40" /> Mission Readiness
                 </h2>
-                 <div className="prose prose-sm md:prose-base prose-invert prose-blue max-w-none">
+                 <div className="bg-card p-4 md:p-12 rounded-3xl border border-border shadow-sm">
                     {app.interviewPrepText ? (
-                      <div className="bg-slate-950/30 p-4 md:p-12 rounded-2xl md:rounded-3xl border border-white/5">
-                         <div className="prose prose-sm md:prose-base prose-invert prose-blue max-w-none prose-p:leading-relaxed prose-headings:font-black prose-li:text-slate-300">
+                        <div className="prose prose-sm md:prose-lg dark:prose-invert prose-neutral max-w-none prose-p:leading-relaxed prose-headings:font-black prose-li:text-foreground/80">
                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
                               {app.interviewPrepText}
                            </ReactMarkdown>
                         </div>
-                     </div>
                    ) : (
-                     <div className="text-center py-20 opacity-50">
+                     <div className="text-center py-20 opacity-50 bg-muted/20 border border-dashed border-border rounded-3xl">
                         <AlertCircle className="w-12 h-12 mx-auto mb-4" />
-                        <p>No prep materials found for this specific application.</p>
+                        <p className="font-black text-xs uppercase tracking-widest">Intelligence generation in progress...</p>
                      </div>
                    )}
                 </div>

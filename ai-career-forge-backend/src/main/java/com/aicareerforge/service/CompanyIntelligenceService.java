@@ -34,4 +34,29 @@ public class CompanyIntelligenceService {
 
         return chatClient.prompt().user(prompt).call().content();
     }
+
+    public String findCompanyLogoUrl(String companyName) {
+        log.info("AI Researching logo for company: {}", companyName);
+        try {
+            String prompt = String.format("""
+                SYSTEM: You are a corporate branding researcher. 
+                USER: What is the official primary domain of the company '%s'? 
+                Only return the domain name (e.g., google.com, openai.com). 
+                Do not include any other text, protocols, or paths.
+                """, companyName);
+
+            String domain = chatClient.prompt().user(prompt).call().content().trim().toLowerCase();
+            
+            // Basic sanity check/cleaning of the LLM output
+            if (domain.contains(" ")) domain = domain.split(" ")[0];
+            if (domain.startsWith("http")) domain = domain.replaceAll("https?://(www\\.)?", "");
+            if (domain.endsWith("/")) domain = domain.substring(0, domain.length() - 1);
+            
+            log.info("Logo Agency identified domain: {} for company: {}", domain, companyName);
+            return "https://logos.hunter.io/" + domain;
+        } catch (Exception e) {
+            log.warn("Failed to AI-resolve logo for {}: {}", companyName, e.getMessage());
+            return null; 
+        }
+    }
 }

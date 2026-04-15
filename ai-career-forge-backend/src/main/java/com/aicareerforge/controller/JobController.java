@@ -48,9 +48,11 @@ public class JobController {
         UserProfile profile = userProfileService.getProfile(user.getId());
         List<String> matchedSkills = jobService.detectMatchedSkills(job, String.join(", ", profile.getSkills()));
         
-        // Re-calculate match score if not present
-        Double score = job.getMatchScore();
-        if (score == null) score = 75.0; // Default
+        // Priority: Cached Score (from list view) > Fresh Calculation (baseline)
+        Double score = jobService.getCachedScore(user.getId(), id);
+        if (score == null) {
+            score = jobService.calculateMatchScore(job, profile, 0.7); // Baseline fallback
+        }
         
         return ResponseEntity.ok(new JobDetailResponse(job, matchedSkills, score));
     }
