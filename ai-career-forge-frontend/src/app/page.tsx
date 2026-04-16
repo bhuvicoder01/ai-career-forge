@@ -39,8 +39,8 @@ export default function Home() {
           </div>
           <div className="hidden md:flex items-center gap-8 text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">Agents</a>
-            <a href="#workflow" className="hover:text-foreground transition-colors">Workflow</a>
-            <a href="#security" className="hover:text-foreground transition-colors">Security</a>
+            {/* <a href="#workflow" className="hover:text-foreground transition-colors">Workflow</a>
+            <a href="#security" className="hover:text-foreground transition-colors">Security</a> */}
           </div>
           <div className="flex items-center gap-4">
              {isAuthenticated ? (
