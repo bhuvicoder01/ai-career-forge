@@ -21,7 +21,12 @@ public class UserProfileService {
 
     public UserProfile getProfile(String userId) {
         return userProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Profile not found"));
+                .orElseGet(() -> {
+                    UserProfile newProfile = UserProfile.builder()
+                            .userId(userId)
+                            .build();
+                    return userProfileRepository.save(newProfile);
+                });
     }
 
     public UserProfile updateProfile(String userId, UserProfile updatedData) {

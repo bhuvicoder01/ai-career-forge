@@ -25,16 +25,16 @@ public class UserProfile {
     private String parsedGoals;
     private String rawResumeText;
     
-    private List<String> skills;
-    private List<Experience> experiences;
+    private List<String> skills = new java.util.ArrayList<>();
+    private List<Experience> experiences = new java.util.ArrayList<>();
 
     private String preferredLocation;
     private String preferredSalary;
     private String preferredLifestyle;
 
-    private List<AcademicProject> academicProjects;
-    private List<Certification> certifications;
-    private List<Internship> internships;
+    private List<AcademicProject> academicProjects = new java.util.ArrayList<>();
+    private List<Certification> certifications = new java.util.ArrayList<>();
+    private List<Internship> internships = new java.util.ArrayList<>();
 
     @Data
     @NoArgsConstructor
