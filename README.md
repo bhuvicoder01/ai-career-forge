@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="ai-career-forge-frontend/public/zenith-logo.png" alt="Zenith Logo" width="280" />
+  <img src="ai-career-forge-frontend/public/zenith-dark.png" alt="Zenith Logo" width="280" />
 </p>
 
 <h1 align="center">ZENITH</h1>
