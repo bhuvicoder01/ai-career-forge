@@ -272,18 +272,6 @@ To enable semantic job matching, create a **Vector Search Index** in your Atlas 
 
 ---
 
-## 👥 Team
-
-| Name | Enrollment No. | Role |
-|---|---|---|
-| **Bhuvnesh Pal** | BETN1CS22279 | Full-Stack Lead / AI Architecture |
-| **Kushank Rawat** | BETN1CS22256 | Backend & Database Engineering |
-| **Saurya Chauhan** | BETN1CS22242 | Frontend & UI/UX Design |
-
-**Guide**: Ms. Anjali Saraswat, Associate Professor, Dept. of CSE, ITM University, Gwalior
-
----
-
 ## 📚 References
 
 Key references from the project report:
@@ -307,5 +295,5 @@ This project is licensed under the MIT License.
 ---
 
 <p align="center">
-  <sub>© 2026 Zenith Intelligence — ITM University, Gwalior</sub>
+  <sub>© 2026 Zenith Intelligence</sub>
 </p>
