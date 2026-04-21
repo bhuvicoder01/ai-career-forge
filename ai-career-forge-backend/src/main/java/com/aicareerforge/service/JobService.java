@@ -1,5 +1,6 @@
 package com.aicareerforge.service;
 
+import com.aicareerforge.dto.RemotiveJobResponse;
 import com.aicareerforge.model.Job;
 import com.aicareerforge.model.UserProfile;
 import com.aicareerforge.repository.JobRepository;
@@ -29,6 +30,8 @@ public class JobService {
     private final JobRepository jobRepository;
     private final JobRecommendationAgent recommendationAgent;
     private final AdzunaClient adzunaClient;
+    private final RemotiveClient remotiveClient;
+    private final JSearchClient jSearchClient;
     private final CompanyIntelligenceService companyIntelligenceService;
     
     // User ID -> (Job ID -> Score)
@@ -38,6 +41,205 @@ public class JobService {
         return jobRepository.findAll(PageRequest.of(page, size));
     }
 
+    /**
+     * Fetch jobs from Adzuna and save them scoped to a specific user.
+     */
+    public List<Job> fetchAndSyncAdzunaJobs(String keyword, String location, String userId) {
+        log.info("Fetching and syncing Adzuna jobs for keyword: '{}', location: '{}', user: {}", keyword, location, userId);
+        
+        var adzunaJobs = adzunaClient.searchJobs(keyword, location, 1);
+        
+        List<Job> syncedJobs = new ArrayList<>();
+        for (var adzunaJob : adzunaJobs) {
+            String sourceJobId = "adzuna-" + adzunaJob.getId();
+            
+            // Skip if this user already has this job
+            if (jobRepository.existsBySourceJobIdAndUserId(sourceJobId, userId)) {
+                continue;
+            }
+            
+            Job job = Job.builder()
+                    .userId(userId)
+                    .title(adzunaJob.getTitle())
+                    .company(adzunaJob.getCompany() != null ? adzunaJob.getCompany().getDisplayName() : "Unknown")
+                    .location(adzunaJob.getLocation() != null ? adzunaJob.getLocation().getDisplayName() : "Unknown")
+                    .description(adzunaJob.getDescription())
+                    .salaryMin(adzunaJob.getSalaryMin())
+                    .salaryMax(adzunaJob.getSalaryMax())
+                    .url(adzunaJob.getRedirectUrl())
+                    .source("adzuna")
+                    .sourceJobId(sourceJobId)
+                    .postedDate(LocalDateTime.now())
+                    .build();
+            
+            // Enrich with intelligence (Prioritize our own logo service for theme-awareness and to avoid hotlinking blocks)
+            try {
+                job.setCultureAnalysis(companyIntelligenceService.fetchCultureInsights(job.getCompany(), job.getTitle()));
+                
+                CompanyIntelligenceService.LogoMetaData logoMeta = companyIntelligenceService.findCompanyLogoUrl(job.getCompany());
+                if (logoMeta != null && logoMeta.url() != null && !logoMeta.url().isBlank()) {
+                    job.setCompanyLogoUrl(logoMeta.url());
+                    job.setCompanyLogoTheme(logoMeta.theme());
+                }
+                
+                log.debug("Enriched job with culture insights and theme-aware logo for {}", job.getCompany());
+            } catch (Exception e) {
+                log.error("Failed to enrich job with culture insights/logo: {}", e.getMessage());
+            }
+
+            Job saved = saveJob(job);
+            if (saved != null) syncedJobs.add(saved);
+        }
+        
+        log.info("Successfully synced {} new Adzuna jobs for user {}", syncedJobs.size(), userId);
+        return syncedJobs;
+    }
+
+    /**
+     * Fetch remote jobs from Remotive and save them scoped to a specific user.
+     */
+    public List<Job> fetchAndSyncRemotiveJobs(String keyword, String userId) {
+        log.info("Fetching and syncing Remotive jobs for keyword: '{}', user: {}", keyword, userId);
+        
+        var remotiveJobs = remotiveClient.searchJobs(keyword, "software-dev", 15);
+        
+        List<Job> syncedJobs = new ArrayList<>();
+        for (RemotiveJobResponse.RemotiveJobDto remotiveJob : remotiveJobs) {
+            String sourceJobId = "remotive-" + remotiveJob.getId();
+            
+            // Skip if this user already has this job
+            if (jobRepository.existsBySourceJobIdAndUserId(sourceJobId, userId)) {
+                continue;
+            }
+            
+            // Parse salary range from Remotive's free-text salary field
+            Double salaryMin = null;
+            Double salaryMax = null;
+            if (remotiveJob.getSalary() != null && !remotiveJob.getSalary().isBlank()) {
+                try {
+                    Matcher salaryMatcher = Pattern.compile("(\\d[\\d,]*)").matcher(remotiveJob.getSalary().replace(",", ""));
+                    List<Double> salaryValues = new ArrayList<>();
+                    while (salaryMatcher.find()) {
+                        salaryValues.add(Double.parseDouble(salaryMatcher.group(1)));
+                    }
+                    if (salaryValues.size() >= 2) {
+                        salaryMin = salaryValues.get(0);
+                        salaryMax = salaryValues.get(1);
+                    } else if (salaryValues.size() == 1) {
+                        salaryMin = salaryValues.get(0);
+                        salaryMax = salaryValues.get(0);
+                    }
+                } catch (Exception e) {
+                    log.debug("Could not parse salary from Remotive: {}", remotiveJob.getSalary());
+                }
+            }
+            
+            Job job = Job.builder()
+                    .userId(userId)
+                    .title(remotiveJob.getTitle())
+                    .company(remotiveJob.getCompanyName() != null ? remotiveJob.getCompanyName() : "Unknown")
+                    .location(remotiveJob.getCandidateRequiredLocation() != null ? remotiveJob.getCandidateRequiredLocation() : "Remote")
+                    .description(stripHtml(remotiveJob.getDescription()))
+                    .salaryMin(salaryMin)
+                    .salaryMax(salaryMax)
+                    .url(remotiveJob.getUrl())
+                    .jobType(remotiveJob.getJobType())
+                    .source("remotive")
+                    .sourceJobId(sourceJobId)
+                    .companyLogoUrl(remotiveJob.getCompanyLogo())
+                    .postedDate(LocalDateTime.now())
+                    .build();
+            
+            // Enrich with intelligence (Prioritize our own service to avoid Remotive's hotlinking protection)
+            try {
+                job.setCultureAnalysis(companyIntelligenceService.fetchCultureInsights(job.getCompany(), job.getTitle()));
+                
+                CompanyIntelligenceService.LogoMetaData logoMeta = companyIntelligenceService.findCompanyLogoUrl(job.getCompany());
+                if (logoMeta != null && logoMeta.url() != null && !logoMeta.url().isBlank()) {
+                    job.setCompanyLogoUrl(logoMeta.url());
+                    job.setCompanyLogoTheme(logoMeta.theme());
+                    log.debug("Using internal theme-aware logo for {}", job.getCompany());
+                } else if (job.getCompanyLogoUrl() == null || job.getCompanyLogoUrl().isBlank()) {
+                    // Last resort fallback to Remotive's logo (even if it might 403)
+                    job.setCompanyLogoUrl(remotiveJob.getCompanyLogo());
+                }
+            } catch (Exception e) {
+                log.error("Failed to enrich Remotive job with intelligence: {}", e.getMessage());
+            }
+
+            Job saved = saveJob(job);
+            if (saved != null) syncedJobs.add(saved);
+        }
+        
+        log.info("Successfully synced {} new Remotive jobs for user {}", syncedJobs.size(), userId);
+        return syncedJobs;
+    }
+
+    /**
+     * Fetch jobs from JSearch (RapidAPI) and save them scoped to a specific user.
+     */
+    public List<Job> fetchAndSyncJSearchJobs(String keyword, String location, String userId) {
+        log.info("Fetching and syncing JSearch jobs for keyword: '{}', location: '{}', user: {}", keyword, location, userId);
+        
+        var jSearchJobs = jSearchClient.searchJobs(keyword, location, 1);
+        
+        List<Job> syncedJobs = new ArrayList<>();
+        for (var jJob : jSearchJobs) {
+            String sourceJobId = "jsearch-" + jJob.getJobId();
+            
+            // Skip if this user already has this job
+            if (jobRepository.existsBySourceJobIdAndUserId(sourceJobId, userId)) {
+                continue;
+            }
+            
+            // Format location
+            String jobLocation = "Remote";
+            if (jJob.getJobCity() != null) jobLocation = jJob.getJobCity();
+            if (jJob.getJobState() != null) jobLocation += ", " + jJob.getJobState();
+            if (jJob.getJobCountry() != null) jobLocation += " (" + jJob.getJobCountry() + ")";
+
+            Job job = Job.builder()
+                    .userId(userId)
+                    .title(jJob.getJobTitle())
+                    .company(jJob.getEmployerName() != null ? jJob.getEmployerName() : "Unknown")
+                    .location(jobLocation)
+                    .description(jJob.getJobDescription())
+                    .salaryMin(jJob.getJobMinSalary())
+                    .salaryMax(jJob.getJobMaxSalary())
+                    .url(jJob.getJobApplyLink())
+                    .jobType(jJob.getJobEmploymentType())
+                    .source("jsearch")
+                    .sourceJobId(sourceJobId)
+                    .companyLogoUrl(jJob.getEmployerLogo())
+                    .postedDate(LocalDateTime.now())
+                    .build();
+            
+            // Enrich with intelligence (Prioritize our own logo service)
+            try {
+                job.setCultureAnalysis(companyIntelligenceService.fetchCultureInsights(job.getCompany(), job.getTitle()));
+                
+                CompanyIntelligenceService.LogoMetaData logoMeta = companyIntelligenceService.findCompanyLogoUrl(job.getCompany());
+                if (logoMeta != null && logoMeta.url() != null && !logoMeta.url().isBlank()) {
+                    job.setCompanyLogoUrl(logoMeta.url());
+                    job.setCompanyLogoTheme(logoMeta.theme());
+                } else if (job.getCompanyLogoUrl() == null || job.getCompanyLogoUrl().isBlank()) {
+                    job.setCompanyLogoUrl(jJob.getEmployerLogo());
+                }
+            } catch (Exception e) {
+                log.error("Failed to enrich JSearch job: {}", e.getMessage());
+            }
+
+            Job saved = saveJob(job);
+            if (saved != null) syncedJobs.add(saved);
+        }
+        
+        log.info("Successfully synced {} new JSearch jobs for user {}", syncedJobs.size(), userId);
+        return syncedJobs;
+    }
+
+    /**
+     * Legacy method for manual search — still global (no userId) for ad-hoc queries.
+     */
     public List<Job> fetchAndSyncJobs(String keyword, String location) {
         log.info("Fetching and syncing real jobs for keyword: {} and location: {}", keyword, location);
         
@@ -58,14 +260,12 @@ public class JobService {
                     .postedDate(LocalDateTime.now())
                     .build();
             
-            // Enrich with intelligence if it's a new job
             if (!jobRepository.existsBySourceJobId(job.getSourceJobId())) {
                  try {
                      job.setCultureAnalysis(companyIntelligenceService.fetchCultureInsights(job.getCompany(), job.getTitle()));
                      CompanyIntelligenceService.LogoMetaData logoMeta = companyIntelligenceService.findCompanyLogoUrl(job.getCompany());
                      job.setCompanyLogoUrl(logoMeta.url());
                      job.setCompanyLogoTheme(logoMeta.theme());
-                     log.debug("Enriched job with culture insights and theme-aware logo for {}", job.getCompany());
                  } catch (Exception e) {
                      log.error("Failed to enrich job with culture insights/logo: {}", e.getMessage());
                  }
@@ -94,16 +294,28 @@ public class JobService {
                 userProfileData != null ? userProfileData.length() : 0);
         
         if (userProfileData == null || userProfileData.isBlank()) {
-            log.warn("User profile data is empty, returning no recommendations");
-            return List.of();
+            log.warn("User profile data is empty, falling back to user's stored jobs");
+            return getFallbackJobs(profile);
         }
 
         // Pre-compute experience years from profile
         int totalExperienceYears = estimateExperienceYears(profile);
         log.info("Estimated total experience years: {}", totalExperienceYears);
 
-        List<Document> documents = recommendationAgent.searchSimilarJobs(userProfileData);
-        log.info("Vector search found {} matching documents", documents.size());
+        List<Document> documents;
+        try {
+            documents = recommendationAgent.searchSimilarJobs(userProfileData);
+            log.info("Vector search found {} matching documents", documents.size());
+        } catch (Exception e) {
+            log.error("Vector search failed (embedding API may be unavailable): {}. Falling back to stored jobs.", e.getMessage());
+            return getFallbackJobs(profile);
+        }
+
+        // If vector search returned nothing, fall back to stored jobs
+        if (documents.isEmpty()) {
+            log.info("Vector search returned 0 results, falling back to stored jobs for user.");
+            return getFallbackJobs(profile);
+        }
         
         return documents.stream()
                 .map(doc -> {
@@ -113,6 +325,11 @@ public class JobService {
                     if (job == null) {
                         log.warn("Job ID {} found in vector store but not in repository", jobId);
                     } else {
+                        // Only include jobs belonging to this user (or global jobs with no userId)
+                        if (job.getUserId() != null && !job.getUserId().equals(profile.getUserId())) {
+                            return null; // Skip jobs belonging to other users
+                        }
+                        
                         // --- Multi-factor Match Score (65-100 range) ---
                         double baseScore = 70.0;
 
@@ -154,6 +371,35 @@ public class JobService {
                 .filter(Objects::nonNull)
                 .sorted((a, b) -> Double.compare(b.getMatchScore(), a.getMatchScore()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Fallback: Return the user's stored jobs directly from MongoDB with skill-based scoring.
+     * Used when the embedding API is unavailable or vector search returns no results.
+     */
+    private List<Job> getFallbackJobs(UserProfile profile) {
+        String userId = profile.getUserId();
+        if (userId == null) return List.of();
+
+        List<Job> userJobs = jobRepository.findByUserId(userId);
+        log.info("Fallback: returning {} stored jobs for user {}", userJobs.size(), userId);
+
+        for (Job job : userJobs) {
+            Double score = calculateMatchScore(job, profile, 0.5); // Moderate baseline similarity
+            job.setMatchScore(score);
+
+            if (profile.getUserId() != null) {
+                scoreCache.computeIfAbsent(profile.getUserId(), k -> new ConcurrentHashMap<>())
+                          .put(job.getId(), score);
+            }
+
+            if (job.getRelevanceExplanation() == null || job.getRelevanceExplanation().isBlank()) {
+                job.setRelevanceExplanation("Matched based on your profile skills and preferences.");
+            }
+        }
+
+        userJobs.sort((a, b) -> Double.compare(b.getMatchScore(), a.getMatchScore()));
+        return userJobs;
     }
 
     public double calculateMatchScore(Job job, UserProfile profile, Double vectorSimilarity) {
@@ -284,16 +530,40 @@ public class JobService {
     }
 
     public Job saveJob(Job job) {
-        Job existingJob = jobRepository.findBySourceJobId(job.getSourceJobId()).orElse(null);
-        if (existingJob == null) {
-            Job savedJob = jobRepository.save(job);
-            recommendationAgent.indexJob(savedJob);
-            return savedJob;
+        // User-scoped dedup: check by sourceJobId + userId
+        if (job.getUserId() != null) {
+            Job existingJob = jobRepository.findBySourceJobIdAndUserId(job.getSourceJobId(), job.getUserId()).orElse(null);
+            if (existingJob == null) {
+                Job savedJob = jobRepository.save(job);
+                recommendationAgent.indexJob(savedJob);
+                return savedJob;
+            } else {
+                recommendationAgent.indexJob(existingJob);
+                return existingJob;
+            }
         } else {
-            // Even if it exists in DB, ensure it's indexed in Vector Store
-            recommendationAgent.indexJob(existingJob);
-            return existingJob;
+            // Legacy global dedup (for scheduled sync / manual search)
+            Job existingJob = jobRepository.findBySourceJobId(job.getSourceJobId()).orElse(null);
+            if (existingJob == null) {
+                Job savedJob = jobRepository.save(job);
+                recommendationAgent.indexJob(savedJob);
+                return savedJob;
+            } else {
+                recommendationAgent.indexJob(existingJob);
+                return existingJob;
+            }
         }
+    }
+
+    /**
+     * Purge all jobs for a specific user only.
+     */
+    public void purgeJobsForUser(String userId) {
+        log.info("Purging all jobs for user: {}", userId);
+        jobRepository.deleteAllByUserId(userId);
+        // Note: We don't clear the entire vector store, just the user's jobs.
+        // The vector store entries will become orphaned but won't match the user's queries
+        // since getRecommendedJobs filters by userId.
     }
 
     public void reindexAllJobs() {
@@ -307,5 +577,19 @@ public class JobService {
         log.info("Purging all existing jobs from database and vector store...");
         jobRepository.deleteAll();
         recommendationAgent.clearVectorStore();
+    }
+
+    /**
+     * Strip HTML tags from Remotive descriptions.
+     */
+    private String stripHtml(String html) {
+        if (html == null) return null;
+        return html.replaceAll("<[^>]*>", " ")
+                   .replaceAll("&amp;", "&")
+                   .replaceAll("&lt;", "<")
+                   .replaceAll("&gt;", ">")
+                   .replaceAll("&nbsp;", " ")
+                   .replaceAll("\\s+", " ")
+                   .trim();
     }
 }

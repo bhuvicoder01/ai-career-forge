@@ -6,7 +6,7 @@ import useAuthStore from "@/store/useAuthStore";
 import api from "@/lib/api";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, needsOnboarding, setNeedsOnboarding } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
   const [isReady, setIsReady] = useState(false);
@@ -15,7 +15,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const checkSession = async () => {
       if (isAuthenticated) {
         try {
-          await api.get("/profile");
+          // Validate session and check onboarding status
+          const [, onboardingRes] = await Promise.all([
+            api.get("/profile"),
+            api.get("/profile/onboarding-status"),
+          ]);
+          const { needsOnboarding: needs } = onboardingRes.data;
+          setNeedsOnboarding(needs);
         } catch (error) {
           // 401 is handled by api interceptor
           console.error("Session check failed", error);
@@ -30,16 +36,28 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isReady) return;
 
-    // Basic route protection logic
     const isAuthRoute = pathname.startsWith("/auth");
+    const isOnboardingRoute = pathname === "/auth/onboarding";
     const isDashboardRoute = pathname.startsWith("/dashboard");
 
     if (isDashboardRoute && !isAuthenticated) {
+      // Not logged in → send to login
       router.replace("/auth/login");
-    } else if (isAuthRoute && isAuthenticated) {
+    } else if (isDashboardRoute && isAuthenticated && needsOnboarding) {
+      // Logged in but needs onboarding → send to onboarding
+      router.replace("/auth/onboarding");
+    } else if (isOnboardingRoute && isAuthenticated && !needsOnboarding) {
+      // Already completed onboarding → send to dashboard
       router.replace("/dashboard");
+    } else if (isAuthRoute && !isOnboardingRoute && isAuthenticated) {
+      // On login/register page but already authenticated
+      if (needsOnboarding) {
+        router.replace("/auth/onboarding");
+      } else {
+        router.replace("/dashboard");
+      }
     }
-  }, [isAuthenticated, pathname, router, isReady]);
+  }, [isAuthenticated, needsOnboarding, pathname, router, isReady]);
 
   if (!isReady) {
     return (

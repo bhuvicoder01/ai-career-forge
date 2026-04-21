@@ -18,6 +18,8 @@ interface Job {
   url?: string;
   companyLogoUrl?: string;
   companyLogoTheme?: string;
+  source?: string;
+  jobType?: string;
 }
 
 export default function JobsPage() {
@@ -54,7 +56,7 @@ export default function JobsPage() {
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isSyncing) {
-      interval = setInterval(fetchRecommended, 8000);
+      interval = setInterval(fetchRecommended, 16000);
     }
     return () => {
       if (interval) clearInterval(interval);
@@ -181,9 +183,22 @@ export default function JobsPage() {
           jobs.map((job) => (
             <div key={job.id} className="group relative bg-card border border-border rounded-2xl p-8 hover:shadow-2xl hover:shadow-primary/5 transition-all flex flex-col gap-5">
               {/* Match Score Badge */}
-              <div className="absolute top-4 right-4 flex items-center gap-1.5 px-4 py-1.5 bg-foreground text-background rounded-full text-[10px] font-black uppercase tracking-widest border border-transparent shadow-lg">
-                <Star className="w-3.5 h-3.5 fill-current" />
-                {Math.round(job.matchScore)}% Match
+              <div className="absolute top-4 right-4 flex items-center gap-2">
+                {job.source && (
+                  <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                    job.source === 'remotive'
+                      ? 'bg-violet-500/10 text-violet-400 border-violet-500/30'
+                      : job.source === 'jsearch'
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                        : 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                  }`}>
+                    {job.source}
+                  </span>
+                )}
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background rounded-full text-[10px] font-black uppercase tracking-widest border border-transparent shadow-lg">
+                  <Star className="w-3.5 h-3.5 fill-current" />
+                  {Math.round(job.matchScore)}% Match
+                </div>
               </div>
 
               <div className="flex items-start gap-4 min-w-0">

@@ -29,14 +29,27 @@ public class UserProfileService {
                 });
     }
 
+    /**
+     * Check if a user still needs to complete onboarding.
+     * A user needs onboarding if they have no resume and no skills extracted.
+     */
+    public boolean needsOnboarding(String userId) {
+        UserProfile profile = getProfile(userId);
+        boolean hasResume = profile.getResumeS3Url() != null && !profile.getResumeS3Url().isBlank();
+        boolean hasSkills = profile.getSkills() != null && !profile.getSkills().isEmpty();
+        return !hasResume && !hasSkills;
+    }
+
     public UserProfile updateProfile(String userId, UserProfile updatedData) {
         UserProfile profile = getProfile(userId);
         if (updatedData.getSkills() != null) profile.setSkills(updatedData.getSkills());
+        if (updatedData.getParsedGoals() != null) profile.setParsedGoals(updatedData.getParsedGoals());
         if (updatedData.getPreferredLocation() != null) profile.setPreferredLocation(updatedData.getPreferredLocation());
         if (updatedData.getPreferredSalary() != null) profile.setPreferredSalary(updatedData.getPreferredSalary());
         if (updatedData.getPreferredLifestyle() != null) profile.setPreferredLifestyle(updatedData.getPreferredLifestyle());
         
-        jobService.purgeAllJobs();
+        // Only purge THIS user's jobs, not all jobs
+        jobService.purgeJobsForUser(userId);
         userProfileRepository.save(profile);
         jobSyncService.syncJobsForUser(userId);
         return profile;
@@ -68,9 +81,68 @@ public class UserProfileService {
         profile.setCertifications(extractedInfo.getCertifications());
         profile.setParsedGoals(extractedInfo.getParsedGoals());
         
-        jobService.purgeAllJobs();
+        // Only purge THIS user's jobs, not all jobs
+        jobService.purgeJobsForUser(userId);
         userProfileRepository.save(profile);
         jobSyncService.syncJobsForUser(userId);
+        return profile;
+    }
+
+    /**
+     * Combined onboarding: Upload resume + set preferences in one flow.
+     * Called from onboarding endpoint after user completes all steps.
+     */
+    public UserProfile completeOnboarding(String userId, MultipartFile resumeFile,
+                                           String parsedGoals, String preferredLocation,
+                                           String preferredSalary, String preferredLifestyle) {
+        UserProfile profile = getProfile(userId);
+        
+        // Step 1: Process resume if provided
+        if (resumeFile != null && !resumeFile.isEmpty()) {
+            byte[] bytes;
+            try {
+                bytes = resumeFile.getBytes();
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to read file", e);
+            }
+            
+            String s3Key = s3Service.uploadFile(bytes, resumeFile.getOriginalFilename(), userId);
+            String presignedUrl = s3Service.getPresignedUrl(s3Key);
+            profile.setResumeS3Url(presignedUrl);
+            
+            String extractedText = extractTextFromPdf(resumeFile);
+            profile.setRawResumeText(extractedText);
+            
+            UserProfile extractedInfo = profileAiAgent.extractProfileFromResume(extractedText);
+            profile.setSkills(extractedInfo.getSkills());
+            profile.setExperiences(extractedInfo.getExperiences());
+            profile.setInternships(extractedInfo.getInternships());
+            profile.setAcademicProjects(extractedInfo.getAcademicProjects());
+            profile.setCertifications(extractedInfo.getCertifications());
+            // Use AI-extracted goals if user didn't provide their own
+            if ((parsedGoals == null || parsedGoals.isBlank()) && extractedInfo.getParsedGoals() != null) {
+                profile.setParsedGoals(extractedInfo.getParsedGoals());
+            }
+        }
+        
+        // Step 2: Set preferences
+        if (parsedGoals != null && !parsedGoals.isBlank()) {
+            profile.setParsedGoals(parsedGoals);
+        }
+        if (preferredLocation != null && !preferredLocation.isBlank()) {
+            profile.setPreferredLocation(preferredLocation);
+        }
+        if (preferredSalary != null && !preferredSalary.isBlank()) {
+            profile.setPreferredSalary(preferredSalary);
+        }
+        if (preferredLifestyle != null && !preferredLifestyle.isBlank()) {
+            profile.setPreferredLifestyle(preferredLifestyle);
+        }
+        
+        // Step 3: Save and trigger multi-source sync
+        userProfileRepository.save(profile);
+        jobSyncService.syncJobsForUser(userId);
+        
         return profile;
     }
 

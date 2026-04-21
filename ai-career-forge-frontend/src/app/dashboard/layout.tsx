@@ -200,7 +200,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <main className={`flex-1 bg-background ${isMobile ? 'p-4' : 'p-8'} overflow-y-auto w-full`}>
           {/* Global sync status indicator */}
           {isSyncing && (
-            <div className="mb-6 flex items-center gap-3 bg-secondary border border-border text-foreground px-5 py-3 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm">
+            <div className="mb-6 flex position-sticky items-center gap-3 bg-secondary border border-border text-foreground px-5 py-3 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm">
               <Loader2 className="w-5 h-5 animate-spin" />
               <div className="flex-1">
                 <p className="text-sm font-black">Agent Synchronization</p>

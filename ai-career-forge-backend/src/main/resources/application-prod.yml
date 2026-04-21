@@ -78,6 +78,10 @@ adzuna:
   app-key: ${ADZUNA_APP_KEY}
   country: ${ADZUNA_COUNTRY:in}
 
+rapidapi:
+  key: ${RAPIDAPI_KEY}
+  jsearch-host: jsearch.p.rapidapi.com
+
 app:
   frontend-url: ${FRONTEND_URL:https://ai-career-forge-sable.vercel.app}
 
