@@ -19,7 +19,9 @@ public class Job {
     @Id
     private String id;
     
-    private String source; // e.g., "adzuna", "local"
+    private String userId; // Link to the user whose profile triggered the fetch
+    
+    private String source; // e.g., "adzuna", "remotive", "local"
     private String sourceJobId;
     
     private String title;
@@ -34,6 +36,7 @@ public class Job {
     
     // Additional info
     private String url;
+    private String jobType; // e.g., "full_time", "remote", "contract", "part_time"
     private Double salaryMin;
     private Double salaryMax;
     private LocalDateTime postedDate;

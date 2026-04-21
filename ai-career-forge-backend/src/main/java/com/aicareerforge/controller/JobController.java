@@ -36,8 +36,13 @@ public class JobController {
 
     @GetMapping("/recommended")
     public ResponseEntity<List<Job>> getRecommendedJobs(@AuthenticationPrincipal User user) {
-        UserProfile profile = userProfileService.getProfile(user.getId());
-        return ResponseEntity.ok(jobService.getRecommendedJobs(profile));
+        try {
+            UserProfile profile = userProfileService.getProfile(user.getId());
+            return ResponseEntity.ok(jobService.getRecommendedJobs(profile));
+        } catch (Exception e) {
+            // Absolute safety net — never return 500 for recommendations
+            return ResponseEntity.ok(List.of());
+        }
     }
 
     @GetMapping("/{id}")
@@ -60,8 +65,18 @@ public class JobController {
     @GetMapping("/search")
     public ResponseEntity<List<Job>> searchAndSyncJobs(
             @RequestParam(required = false) String q,
-            @RequestParam(required = false) String l) {
-        return ResponseEntity.ok(jobService.fetchAndSyncJobs(q, l));
+            @RequestParam(required = false) String l,
+            @AuthenticationPrincipal User user) {
+        // User-scoped search: pass userId to scope jobs to the authenticated user
+        String userId = (user != null) ? user.getId() : null;
+        if (userId != null) {
+            List<Job> adzunaJobs = jobService.fetchAndSyncAdzunaJobs(q, l, userId);
+            List<Job> remotiveJobs = jobService.fetchAndSyncRemotiveJobs(q, userId);
+            adzunaJobs.addAll(remotiveJobs);
+            return ResponseEntity.ok(adzunaJobs);
+        } else {
+            return ResponseEntity.ok(jobService.fetchAndSyncJobs(q, l));
+        }
     }
 
     @PostMapping("/reindex")
@@ -88,9 +103,12 @@ public class JobController {
         return emitter;
     }
 
+    /**
+     * Purge jobs for the authenticated user only.
+     */
     @DeleteMapping
-    public ResponseEntity<Void> purgeAllJobs() {
-        jobService.purgeAllJobs();
+    public ResponseEntity<Void> purgeJobs(@AuthenticationPrincipal User user) {
+        jobService.purgeJobsForUser(user.getId());
         return ResponseEntity.noContent().build();
     }
 }

@@ -23,6 +23,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final UserProfileService userProfileService;
 
     public AuthResponse register(RegisterRequest request) {
         if (repository.existsByEmail(request.getEmail())) {
@@ -50,6 +51,7 @@ public class AuthService {
                 .userId(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
+                .needsOnboarding(true) // New user always needs onboarding
                 .build();
     }
 
@@ -64,11 +66,15 @@ public class AuthService {
                 .orElseThrow();
         var jwtToken = jwtService.generateToken(user);
         
+        // Check if the user has completed onboarding
+        boolean onboardingNeeded = userProfileService.needsOnboarding(user.getId());
+        
         return AuthResponse.builder()
                 .token(jwtToken)
                 .userId(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
+                .needsOnboarding(onboardingNeeded)
                 .build();
     }
 }

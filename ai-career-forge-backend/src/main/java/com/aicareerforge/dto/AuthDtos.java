@@ -35,5 +35,6 @@ public class AuthDtos {
         private String userId;
         private String name;
         private String email;
+        private boolean needsOnboarding;
     }
 }

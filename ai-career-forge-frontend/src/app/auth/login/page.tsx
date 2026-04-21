@@ -33,9 +33,14 @@ export default function Login() {
         password,
       });
 
-      const { user, token } = response.data;
-      setAuth(user, token);
-      router.push("/dashboard");
+      const { token, userId, name: userName, email: userEmail, needsOnboarding } = response.data;
+      setAuth({ id: userId, email: userEmail, name: userName }, token, needsOnboarding);
+      
+      if (needsOnboarding) {
+        router.push("/auth/onboarding");
+      } else {
+        router.push("/dashboard");
+      }
     } catch (err: any) {
       console.error("Login error:", err);
       setError(err.response?.data?.message || "Invalid credentials. Please try again.");

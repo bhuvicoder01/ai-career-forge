@@ -35,9 +35,9 @@ export default function Register() {
         password,
       });
 
-      const { user, token } = response.data;
-      setAuth(user, token);
-      router.push("/dashboard");
+      const { token, userId, name: userName, email: userEmail, needsOnboarding } = response.data;
+      setAuth({ id: userId, email: userEmail, name: userName }, token, needsOnboarding);
+      router.push("/auth/onboarding");
     } catch (err: any) {
       console.error("Registration error:", err);
       setError(err.response?.data?.message || "Something went wrong. Please try again.");
