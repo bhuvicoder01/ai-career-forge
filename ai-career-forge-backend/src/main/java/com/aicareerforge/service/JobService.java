@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -33,6 +34,7 @@ public class JobService {
     private final RemotiveClient remotiveClient;
     private final JSearchClient jSearchClient;
     private final CompanyIntelligenceService companyIntelligenceService;
+    private final java.util.concurrent.Semaphore enrichmentSemaphore = new java.util.concurrent.Semaphore(2);
     
     // User ID -> (Job ID -> Score)
     private final Map<String, Map<String, Double>> scoreCache = new ConcurrentHashMap<>();
@@ -72,20 +74,8 @@ public class JobService {
                     .postedDate(LocalDateTime.now())
                     .build();
             
-            // Enrich with intelligence (Prioritize our own logo service for theme-awareness and to avoid hotlinking blocks)
-            try {
-                job.setCultureAnalysis(companyIntelligenceService.fetchCultureInsights(job.getCompany(), job.getTitle()));
-                
-                CompanyIntelligenceService.LogoMetaData logoMeta = companyIntelligenceService.findCompanyLogoUrl(job.getCompany());
-                if (logoMeta != null && logoMeta.url() != null && !logoMeta.url().isBlank()) {
-                    job.setCompanyLogoUrl(logoMeta.url());
-                    job.setCompanyLogoTheme(logoMeta.theme());
-                }
-                
-                log.debug("Enriched job with culture insights and theme-aware logo for {}", job.getCompany());
-            } catch (Exception e) {
-                log.error("Failed to enrich job with culture insights/logo: {}", e.getMessage());
-            }
+            // Offload slow AI enrichment and indexing to a background thread
+            enrichAndIndexJobAsync(job);
 
             Job saved = saveJob(job);
             if (saved != null) syncedJobs.add(saved);
@@ -149,23 +139,8 @@ public class JobService {
                     .companyLogoUrl(remotiveJob.getCompanyLogo())
                     .postedDate(LocalDateTime.now())
                     .build();
-            
-            // Enrich with intelligence (Prioritize our own service to avoid Remotive's hotlinking protection)
-            try {
-                job.setCultureAnalysis(companyIntelligenceService.fetchCultureInsights(job.getCompany(), job.getTitle()));
-                
-                CompanyIntelligenceService.LogoMetaData logoMeta = companyIntelligenceService.findCompanyLogoUrl(job.getCompany());
-                if (logoMeta != null && logoMeta.url() != null && !logoMeta.url().isBlank()) {
-                    job.setCompanyLogoUrl(logoMeta.url());
-                    job.setCompanyLogoTheme(logoMeta.theme());
-                    log.debug("Using internal theme-aware logo for {}", job.getCompany());
-                } else if (job.getCompanyLogoUrl() == null || job.getCompanyLogoUrl().isBlank()) {
-                    // Last resort fallback to Remotive's logo (even if it might 403)
-                    job.setCompanyLogoUrl(remotiveJob.getCompanyLogo());
-                }
-            } catch (Exception e) {
-                log.error("Failed to enrich Remotive job with intelligence: {}", e.getMessage());
-            }
+            // Offload slow AI enrichment and indexing to a background thread
+            enrichAndIndexJobAsync(job);
 
             Job saved = saveJob(job);
             if (saved != null) syncedJobs.add(saved);
@@ -214,20 +189,9 @@ public class JobService {
                     .postedDate(LocalDateTime.now())
                     .build();
             
-            // Enrich with intelligence (Prioritize our own logo service)
-            try {
-                job.setCultureAnalysis(companyIntelligenceService.fetchCultureInsights(job.getCompany(), job.getTitle()));
-                
-                CompanyIntelligenceService.LogoMetaData logoMeta = companyIntelligenceService.findCompanyLogoUrl(job.getCompany());
-                if (logoMeta != null && logoMeta.url() != null && !logoMeta.url().isBlank()) {
-                    job.setCompanyLogoUrl(logoMeta.url());
-                    job.setCompanyLogoTheme(logoMeta.theme());
-                } else if (job.getCompanyLogoUrl() == null || job.getCompanyLogoUrl().isBlank()) {
-                    job.setCompanyLogoUrl(jJob.getEmployerLogo());
-                }
-            } catch (Exception e) {
-                log.error("Failed to enrich JSearch job: {}", e.getMessage());
-            }
+            // Offload slow AI enrichment and indexing to a background thread
+            // to keep the sync progress bar moving fast for the user.
+            enrichAndIndexJobAsync(job);
 
             Job saved = saveJob(job);
             if (saved != null) syncedJobs.add(saved);
@@ -585,6 +549,42 @@ public class JobService {
         log.info("Purging all existing jobs from database and vector store...");
         jobRepository.deleteAll();
         recommendationAgent.clearVectorStore();
+    }
+
+    /**
+     * Asynchronously enriches a job with AI culture insights and company logos,
+     * and then updates the vector store index. This keeps the primary sync fast.
+     */
+    @Async("taskExecutor")
+    public void enrichAndIndexJobAsync(Job job) {
+        try {
+            enrichmentSemaphore.acquire();
+            log.debug("Background enrichment started for: {} at {}", job.getTitle(), job.getCompany());
+            
+            // 1. Fetch Culture Insights (AI)
+            String culture = companyIntelligenceService.fetchCultureInsights(job.getCompany(), job.getTitle());
+            job.setCultureAnalysis(culture);
+
+            // 2. Resolve Premium Logo
+            CompanyIntelligenceService.LogoMetaData logoMeta = companyIntelligenceService.findCompanyLogoUrl(job.getCompany());
+            if (logoMeta != null && logoMeta.url() != null && !logoMeta.url().isBlank()) {
+                job.setCompanyLogoUrl(logoMeta.url());
+                job.setCompanyLogoTheme(logoMeta.theme());
+                job.setCompanyLogoColor(logoMeta.color());
+            }
+
+            // 3. Save the enriched job
+            jobRepository.save(job);
+
+            // 4. Update Vector Store with enriched content
+            recommendationAgent.indexJob(job);
+            
+            log.debug("Background enrichment completed for: {}", job.getTitle());
+        } catch (Exception e) {
+            log.error("Background enrichment failed for job {}: {}", job.getId(), e.getMessage());
+        } finally {
+            enrichmentSemaphore.release();
+        }
     }
 
     /**
