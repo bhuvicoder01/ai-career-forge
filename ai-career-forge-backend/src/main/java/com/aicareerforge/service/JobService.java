@@ -290,12 +290,13 @@ public class JobService {
 
     public List<Job> getRecommendedJobs(UserProfile profile) {
         String userProfileData = profile.getRawResumeText();
-        log.info("Fetching recommended jobs for profile data (length: {})", 
-                userProfileData != null ? userProfileData.length() : 0);
         
-        if (userProfileData == null || userProfileData.isBlank()) {
-            log.warn("User profile data is empty, falling back to user's stored jobs");
-            return getFallbackJobs(profile);
+        // Optimize search query: use structured data if available, otherwise raw text
+        String searchQuery = (userProfileData != null) ? userProfileData : "";
+        if (profile.getSkills() != null && !profile.getSkills().isEmpty()) {
+            searchQuery = String.join(", ", profile.getSkills()) + ". " + 
+                          (profile.getParsedGoals() != null ? profile.getParsedGoals() : "");
+            log.info("Using optimized skill-based query for vector search (length: {})", searchQuery.length());
         }
 
         // Pre-compute experience years from profile
@@ -304,10 +305,10 @@ public class JobService {
 
         List<Document> documents;
         try {
-            documents = recommendationAgent.searchSimilarJobs(userProfileData);
+            documents = recommendationAgent.searchSimilarJobs(searchQuery);
             log.info("Vector search found {} matching documents", documents.size());
         } catch (Exception e) {
-            log.error("Vector search failed (embedding API may be unavailable): {}. Falling back to stored jobs.", e.getMessage());
+            log.error("Vector search failed: {}. Falling back to stored jobs.", e.getMessage());
             return getFallbackJobs(profile);
         }
 
@@ -468,8 +469,8 @@ public class JobService {
             return Integer.parseInt(yearsMatcher.group(1));
         }
 
-        // Match "YYYY - YYYY" or "YYYY - Present" pattern
-        Matcher rangeMatcher = Pattern.compile("(\\d{4})\\s*[-–]\\s*(\\d{4}|[Pp]resent|[Cc]urrent)").matcher(duration);
+        // Match "YYYY - YYYY" or "YYYY - Present/Current" pattern
+        Matcher rangeMatcher = Pattern.compile("(\\d{4})\\s*[-–]\\s*(\\d{4}|[Pp]resent|[Cc]urrent|[Nn]ow)").matcher(duration);
         if (rangeMatcher.find()) {
             int startYear = Integer.parseInt(rangeMatcher.group(1));
             String endStr = rangeMatcher.group(2);
@@ -477,11 +478,18 @@ public class JobService {
             return Math.max(0, endYear - startYear);
         }
 
+        // Match "YYYY - " (meaning present)
+        Matcher openRangeMatcher = Pattern.compile("(\\d{4})\\s*[-–]\\s*$").matcher(duration.trim());
+        if (openRangeMatcher.find()) {
+            int startYear = Integer.parseInt(openRangeMatcher.group(1));
+            return Math.max(0, java.time.Year.now().getValue() - startYear);
+        }
+
         // Match "X month(s)" pattern
         Matcher monthsMatcher = Pattern.compile("(\\d+)\\s*month", Pattern.CASE_INSENSITIVE).matcher(duration);
         if (monthsMatcher.find()) {
             int months = Integer.parseInt(monthsMatcher.group(1));
-            return months / 12; // only count full years
+            return Math.max(1, months / 12); // Round up if it's significant? No, stay conservative.
         }
 
         return 0;

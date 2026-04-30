@@ -42,10 +42,17 @@ public class JobSyncService {
             targetSkills.add("Software Developer");
         }
 
-        String location = profile.getPreferredLocation() != null ? profile.getPreferredLocation() : "";
+        String locationString = profile.getPreferredLocation() != null ? profile.getPreferredLocation() : "";
+        List<String> locations = List.of(locationString.split("[,;]+")).stream()
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+        
+        if (locations.isEmpty()) locations = List.of(""); // Default to no location filter
 
-        // Each skill fetches from 3 sources (Adzuna + Remotive + JSearch), so total steps = skills * 3
-        int totalSteps = targetSkills.size() * 3;
+        // Each skill fetches from 3 sources:
+        // Adzuna (once per location) + JSearch (once per location) + Remotive (once per skill)
+        int totalSteps = targetSkills.size() * (locations.size() * 2 + 1);
 
         JobSyncStatus status = syncStatusRepository.findById(userId)
                 .orElse(JobSyncStatus.builder().userId(userId).build());
@@ -60,23 +67,41 @@ public class JobSyncService {
         for (int i = 0; i < targetSkills.size(); i++) {
             String currentSkill = targetSkills.get(i);
 
-            // --- Source 1: Adzuna ---
-            step++;
-            status.setCurrentSkill(currentSkill + " (Adzuna)");
-            status.setProgress(step);
-            status.setLastUpdated(LocalDateTime.now());
-            syncStatusRepository.save(status);
-            sseRegistry.sendStatus(userId, status);
+            for (String loc : locations) {
+                // --- Source 1: Adzuna ---
+                step++;
+                status.setCurrentSkill(currentSkill + " in " + (loc.isEmpty() ? "anywhere" : loc) + " (Adzuna)");
+                status.setProgress(step);
+                status.setLastUpdated(LocalDateTime.now());
+                syncStatusRepository.save(status);
+                sseRegistry.sendStatus(userId, status);
 
-            try {
-                log.info("Syncing Adzuna jobs for '{}', user {} ({}/{})", currentSkill, userId, step, totalSteps);
-                jobService.fetchAndSyncAdzunaJobs(currentSkill, location, userId);
-                Thread.sleep(1000); // Rate limit mitigation
-            } catch (Exception e) {
-                log.error("Adzuna sync failed for skill '{}' for user {}: {}", currentSkill, userId, e.getMessage());
+                try {
+                    log.info("Syncing Adzuna jobs for '{}' in '{}', user {} ({}/{})", currentSkill, loc, userId, step, totalSteps);
+                    jobService.fetchAndSyncAdzunaJobs(currentSkill, loc, userId);
+                    Thread.sleep(1000); // Rate limit mitigation
+                } catch (Exception e) {
+                    log.error("Adzuna sync failed for skill '{}' in {}: {}", currentSkill, loc, e.getMessage());
+                }
+
+                // --- Source 3: JSearch (RapidAPI) ---
+                step++;
+                status.setCurrentSkill(currentSkill + " in " + (loc.isEmpty() ? "anywhere" : loc) + " (JSearch)");
+                status.setProgress(step);
+                status.setLastUpdated(LocalDateTime.now());
+                syncStatusRepository.save(status);
+                sseRegistry.sendStatus(userId, status);
+
+                try {
+                    log.info("Syncing JSearch jobs for '{}' in '{}', user {} ({}/{})", currentSkill, loc, userId, step, totalSteps);
+                    jobService.fetchAndSyncJSearchJobs(currentSkill, loc, userId);
+                    Thread.sleep(1500);
+                } catch (Exception e) {
+                    log.error("JSearch sync failed for skill '{}' in {}: {}", currentSkill, loc, e.getMessage());
+                }
             }
 
-            // --- Source 2: Remotive ---
+            // --- Source 2: Remotive (Location agnostic search) ---
             step++;
             status.setCurrentSkill(currentSkill + " (Remotive)");
             status.setProgress(step);
@@ -90,26 +115,6 @@ public class JobSyncService {
                 Thread.sleep(1000);
             } catch (Exception e) {
                 log.error("Remotive sync failed for skill '{}' for user {}: {}", currentSkill, userId, e.getMessage());
-            }
-
-            // --- Source 3: JSearch (RapidAPI) ---
-            step++;
-            status.setCurrentSkill(currentSkill + " (JSearch)");
-            status.setProgress(step);
-            status.setLastUpdated(LocalDateTime.now());
-            syncStatusRepository.save(status);
-            sseRegistry.sendStatus(userId, status);
-
-            try {
-                log.info("Syncing JSearch jobs for '{}', user {} ({}/{})", currentSkill, userId, step, totalSteps);
-                jobService.fetchAndSyncJSearchJobs(currentSkill, location, userId);
-                
-                // Rate limit mitigation between skills
-                if (i < targetSkills.size() - 1) {
-                    Thread.sleep(1500);
-                }
-            } catch (Exception e) {
-                log.error("JSearch sync failed for skill '{}' for user {}: {}", currentSkill, userId, e.getMessage());
             }
         }
 

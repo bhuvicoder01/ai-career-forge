@@ -27,7 +27,7 @@ public class JSearchClient {
     @Value("${rapidapi.jsearch-host:jsearch.p.rapidapi.com}")
     private String jsearchHost;
 
-    private static final String JSEARCH_URL = "https://jsearch.p.rapidapi.com/search";
+    private static final String JSEARCH_URL = "https://jsearch.p.rapidapi.com/search-v2";
 
     public List<JSearchJobResponse.JSearchJobDto> searchJobs(String keyword, String location, int page) {
         if ("YOUR_RAPIDAPI_KEY_HERE".equals(rapidApiKey) || rapidApiKey == null || rapidApiKey.isBlank()) {
@@ -37,13 +37,15 @@ public class JSearchClient {
 
         String searchContext = keyword;
         if (location != null && !location.isBlank()) {
-            searchContext += " in " + location;
+            // Simplified query - space separation often works better for broad matching
+            searchContext = keyword + " " + location;
         }
 
         String requestUrl = UriComponentsBuilder.fromHttpUrl(JSEARCH_URL)
                 .queryParam("query", searchContext)
                 .queryParam("page", page)
                 .queryParam("num_pages", 1)
+                .queryParam("date_posted", "all")
                 .toUriString();
 
         HttpHeaders headers = new HttpHeaders();
@@ -53,13 +55,16 @@ public class JSearchClient {
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
         try {
-            log.info("Fetching jobs from JSearch (RapidAPI) for query: {}", searchContext);
+            log.info("Fetching jobs from JSearch (RapidAPI v2) for query: {}", searchContext);
             var response = restTemplate.exchange(requestUrl, HttpMethod.GET, entity, JSearchJobResponse.class);
             
-            if (response.getBody() != null && response.getBody().getData() != null) {
-                log.info("JSearch returned {} jobs", response.getBody().getData().size());
-                return response.getBody().getData();
+            if (response.getBody() != null && response.getBody().getData() != null && response.getBody().getData().getJobs() != null) {
+                log.info("JSearch returned {} jobs", response.getBody().getData().getJobs().size());
+                return response.getBody().getData().getJobs();
             }
+            return Collections.emptyList();
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            log.warn("JSearch API request timed out for query: {}. Consider increasing timeout or reducing query complexity.", searchContext);
             return Collections.emptyList();
         } catch (Exception e) {
             log.error("Failed to fetch jobs from JSearch on RapidAPI: {}", e.getMessage());

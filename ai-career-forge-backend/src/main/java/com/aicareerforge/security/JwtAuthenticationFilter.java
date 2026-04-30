@@ -33,13 +33,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String jwt;
         final String userEmail;
         
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            jwt = authHeader.substring(7);
+        } else {
+            // Fallback to query parameter for SSE support
+            jwt = request.getParameter("token");
+        }
+
+        if (jwt == null) {
             filterChain.doFilter(request, response);
             return;
         }
         
         try {
-            jwt = authHeader.substring(7);
             userEmail = jwtService.extractUsername(jwt);
             
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
