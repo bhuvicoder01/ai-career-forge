@@ -60,8 +60,11 @@ public class AdzunaClient {
             
             log.info("Adzuna returned {} jobs for query: {}", results.size(), keyword);
             return results;
+        } catch (org.springframework.web.client.HttpServerErrorException.BadGateway e) {
+            log.warn("Adzuna API is currently unavailable (502 Bad Gateway). Skipping.");
+            return Collections.emptyList();
         } catch (Exception e) {
-            log.error("Failed to fetch jobs from Adzuna", e);
+            log.error("Failed to fetch jobs from Adzuna: {}", e.getMessage());
             return Collections.emptyList();
         }
     }

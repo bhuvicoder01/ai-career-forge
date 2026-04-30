@@ -39,6 +39,7 @@ public class JobRecommendationAgent {
         
         Document document = new Document(job.getId(), content, Map.of(
             "jobId", job.getId(),
+            "userId", job.getUserId() != null ? job.getUserId() : "global",
             "type", "job_listing"
         ));
         
@@ -46,19 +47,20 @@ public class JobRecommendationAgent {
     }
 
     public List<Document> searchSimilarJobs(String userProfileText) {
-        log.info("Searching for similar jobs in vector store with threshold 0.1...");
+        log.info("Searching for similar jobs in vector store with optimized threshold (0.01)...");
         if (userProfileText == null || userProfileText.isBlank()) {
             log.warn("Search text is empty.");
             return List.of();
         }
 
-        // Perform similarity search
+        // Setting threshold to 0.0 for debugging - this will return all results sorted by similarity.
+        // If it still returns 0, the issue is with the MongoDB Search Index or document visibility.
         SearchRequest searchRequest = SearchRequest.query(userProfileText)
-                .withTopK(20)
-                .withSimilarityThreshold(0.1); 
+                .withTopK(50)
+                .withSimilarityThreshold(0.0); 
                 
         List<Document> results = vectorStore.similaritySearch(searchRequest);
-        log.info("Vector store returned {} results.", results.size());
+        log.info("Vector store returned {} results for query length: {}", results.size(), userProfileText.length());
         return results;
     }
 

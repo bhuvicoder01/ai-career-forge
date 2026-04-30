@@ -6,7 +6,13 @@ import java.util.List;
 
 @Data
 public class JSearchJobResponse {
-    private List<JSearchJobDto> data;
+    private DataWrapper data;
+    private String status;
+
+    @Data
+    public static class DataWrapper {
+        private List<JSearchJobDto> jobs;
+    }
 
     @Data
     public static class JSearchJobDto {

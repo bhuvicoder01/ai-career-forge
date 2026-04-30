@@ -43,6 +43,7 @@ public class Job {
     
     private String companyLogoUrl;
     private String companyLogoTheme;
+    private String companyLogoColor;
     
     @org.springframework.data.annotation.Transient
     private Double matchScore;

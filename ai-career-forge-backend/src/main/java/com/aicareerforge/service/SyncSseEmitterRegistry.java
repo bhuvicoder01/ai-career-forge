@@ -21,8 +21,8 @@ public class SyncSseEmitterRegistry {
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
 
     public SseEmitter createEmitter(String userId) {
-        // 5 minutes timeout — long enough for any sync
-        SseEmitter emitter = new SseEmitter(5 * 60 * 1000L);
+        // 10 minutes timeout — long enough for any sync
+        SseEmitter emitter = new SseEmitter(10 * 60 * 1000L);
 
         emitter.onCompletion(() -> {
             log.debug("SSE emitter completed for user: {}", userId);
@@ -36,6 +36,13 @@ public class SyncSseEmitterRegistry {
             log.debug("SSE emitter error for user: {}", userId);
             emitters.remove(userId);
         });
+
+        // Send an initial heartbeat to keep the connection open
+        try {
+            emitter.send(SseEmitter.event().name("heartbeat").data("connected"));
+        } catch (Exception e) {
+            log.warn("Initial heartbeat failed for user: {}", userId);
+        }
 
         emitters.put(userId, emitter);
         return emitter;

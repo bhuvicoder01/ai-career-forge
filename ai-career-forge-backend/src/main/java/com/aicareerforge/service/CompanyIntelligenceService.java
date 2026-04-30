@@ -7,8 +7,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
+import org.springframework.web.client.HttpClientErrorException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -25,6 +28,9 @@ public class CompanyIntelligenceService {
 
     @Value("${logo.dev.token}")
     private String logoDevToken;
+
+    private final Map<String, LogoMetaData> logoCache = new ConcurrentHashMap<>();
+    private LocalDateTime brandfetchCooldownUntil = LocalDateTime.MIN;
 
     public String fetchCultureInsights(String companyName, String role) {
         log.info("Generating culture insights for {} - {}", companyName, role);
@@ -75,10 +81,16 @@ public class CompanyIntelligenceService {
             
             log.info("Logo Agency identified domain: {} for company: {}", domain, companyName);
             
-            log.info("Logo Agency identified domain: {} for company: {}", domain, companyName);
+            // Check cache first
+            if (logoCache.containsKey(domain)) {
+                log.debug("Logo cache hit for domain: {}", domain);
+                return logoCache.get(domain);
+            }
             
-            // 1. Try Brandfetch FIRST (Superior metadata and quality)
-            if (brandfetchToken != null && !brandfetchToken.isEmpty()) {
+            LogoMetaData result = null;
+
+            // 1. Try Brandfetch (Primary - Highest quality & metadata)
+            if (brandfetchToken != null && !brandfetchToken.isEmpty() && LocalDateTime.now().isAfter(brandfetchCooldownUntil)) {
                 try {
                     String url = "https://api.brandfetch.io/v2/brands/" + domain;
                     HttpHeaders headers = new HttpHeaders();
@@ -90,7 +102,6 @@ public class CompanyIntelligenceService {
                     if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                         List<Map<String, Object>> logos = (List<Map<String, Object>>) response.getBody().get("logos");
                         if (logos != null && !logos.isEmpty()) {
-                            // Prefer "icon" or "logo" type
                             Map<String, Object> bestLogo = logos.stream()
                                 .filter(l -> "icon".equals(l.get("type")) || "logo".equals(l.get("type")))
                                 .findFirst()
@@ -101,7 +112,6 @@ public class CompanyIntelligenceService {
                                 String brandfetchUrl = (String) formats.get(0).get("src");
                                 String theme = (String) bestLogo.get("theme");
                                 
-                                // Also try to get an accent color
                                 String accentColor = null;
                                 List<Map<String, Object>> colors = (List<Map<String, Object>>) response.getBody().get("colors");
                                 if (colors != null && !colors.isEmpty()) {
@@ -112,32 +122,70 @@ public class CompanyIntelligenceService {
                                         .orElse(colors.get(0).get("hex"));
                                 }
                                 
-                                log.info("Primary: Brandfetch success for {}: {}, theme: {}", domain, brandfetchUrl, theme);
-                                return new LogoMetaData(brandfetchUrl, theme, accentColor);
+                                log.info("Logo Provider [Brandfetch]: Success for {}", domain);
+                                result = new LogoMetaData(brandfetchUrl, theme, accentColor);
                             }
                         }
                     }
+                } catch (HttpClientErrorException.TooManyRequests e) {
+                    brandfetchCooldownUntil = LocalDateTime.now().plusMinutes(30);
+                    log.warn("Brandfetch quota exceeded (429). Cooling down for 30 mins.");
                 } catch (Exception e) {
-                    log.warn("Brandfetch primary attempt failed for {}: {}. Trying alternate.", domain, e.getMessage());
+                    log.warn("Brandfetch attempt failed for {}: {}", domain, e.getMessage());
                 }
             }
             
-            // 2. Try logo.dev as Secondary (High performance)
-            String logoDevUrl = "https://img.logo.dev/" + domain + "?token=" + logoDevToken;
-            try {
-                ResponseEntity<Void> response = restTemplate.exchange(logoDevUrl, HttpMethod.HEAD, null, Void.class);
-                if (response.getStatusCode() == HttpStatus.OK) {
-                    log.debug("Secondary: logo.dev returned 200 for {}", domain);
-                    return new LogoMetaData(logoDevUrl, null, null);
-                }
-            } catch (Exception e) {
-                log.warn("Secondary alternate check failed for {}: {}", domain, e.getMessage());
+            if (result != null) {
+                logoCache.put(domain, result);
+                return result;
             }
 
-            // Final fallback (URL remains valid even if HEAD fails)
-            return new LogoMetaData(logoDevUrl, null, null);
+            // 2. Try logo.dev (Secondary)
+            if (logoDevToken != null && !logoDevToken.isEmpty()) {
+                String logoDevUrl = "https://img.logo.dev/" + domain + "?token=" + logoDevToken;
+                try {
+                    ResponseEntity<Void> response = restTemplate.exchange(logoDevUrl, HttpMethod.HEAD, null, Void.class);
+                    if (response.getStatusCode() == HttpStatus.OK) {
+                        log.info("Logo Provider [Logo.dev]: Success for {}", domain);
+                        result = new LogoMetaData(logoDevUrl, null, null);
+                    }
+                } catch (Exception e) {
+                    log.warn("Logo.dev check failed for {}: {}", domain, e.getMessage());
+                }
+            }
+
+            if (result != null) {
+                logoCache.put(domain, result);
+                return result;
+            }
+
+            // 3. Try Clearbit (Tertiary - Reliable, no key needed for basic)
+            String clearbitUrl = "https://logo.clearbit.com/" + domain;
+            try {
+                ResponseEntity<Void> response = restTemplate.exchange(clearbitUrl, HttpMethod.HEAD, null, Void.class);
+                if (response.getStatusCode() == HttpStatus.OK) {
+                    log.info("Logo Provider [Clearbit]: Success for {}", domain);
+                    result = new LogoMetaData(clearbitUrl, null, null);
+                }
+            } catch (Exception e) {
+                log.debug("Clearbit check failed for {}: {}", domain, e.getMessage());
+            }
+
+            if (result != null) {
+                logoCache.put(domain, result);
+                return result;
+            }
+
+            // 4. Try Google Favicon (Final fallback - always exists but lower res)
+            String googleUrl = "https://www.google.com/s2/favicons?domain=" + domain + "&sz=128";
+            log.info("Logo Provider [Google]: Fallback for {}", domain);
+            result = new LogoMetaData(googleUrl, null, null);
+            
+            logoCache.put(domain, result);
+            return result;
+
         } catch (Exception e) {
-            log.warn("Failed to AI-resolve logo for {}: {}", companyName, e.getMessage());
+            log.error("Critical error in logo resolution for {}: {}", companyName, e.getMessage());
             return new LogoMetaData(null, null, null); 
         }
     }

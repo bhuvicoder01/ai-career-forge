@@ -35,17 +35,28 @@ public class JobSyncService {
 
         List<String> targetSkills = profile.getSkills().stream()
                 .filter(s -> s.length() > 2)
-                .limit(10) // Match more skills for comprehensive fetching
+                .limit(5) // Reduced limit to ensure faster completion and less rate-limiting
                 .collect(Collectors.toList());
 
         if (targetSkills.isEmpty()) {
             targetSkills.add("Software Developer");
         }
 
-        String location = profile.getPreferredLocation() != null ? profile.getPreferredLocation() : "";
+        // Semaphores to prevent 429 Too Many Requests by limiting concurrent API calls
+        final java.util.concurrent.Semaphore adzunaSemaphore = new java.util.concurrent.Semaphore(1);
+        final java.util.concurrent.Semaphore jSearchSemaphore = new java.util.concurrent.Semaphore(2);
 
-        // Each skill fetches from 3 sources (Adzuna + Remotive + JSearch), so total steps = skills * 3
-        int totalSteps = targetSkills.size() * 3;
+        String locationString = profile.getPreferredLocation() != null ? profile.getPreferredLocation() : "";
+        List<String> locations = List.of(locationString.split("[,;]+")).stream()
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+        
+        List<String> finalLocations = locations.isEmpty() ? List.of("") : locations;
+
+        // Each skill fetches from 3 sources:
+        // Adzuna (once per location) + JSearch (once per location) + Remotive (once per skill)
+        final int totalSteps = targetSkills.size() * (finalLocations.size() * 2 + 1);
 
         JobSyncStatus status = syncStatusRepository.findById(userId)
                 .orElse(JobSyncStatus.builder().userId(userId).build());
@@ -56,62 +67,62 @@ public class JobSyncService {
         syncStatusRepository.save(status);
         sseRegistry.sendStatus(userId, status);
 
-        int step = 0;
-        for (int i = 0; i < targetSkills.size(); i++) {
-            String currentSkill = targetSkills.get(i);
+        java.util.concurrent.atomic.AtomicInteger stepCounter = new java.util.concurrent.atomic.AtomicInteger(0);
 
-            // --- Source 1: Adzuna ---
-            step++;
-            status.setCurrentSkill(currentSkill + " (Adzuna)");
-            status.setProgress(step);
-            status.setLastUpdated(LocalDateTime.now());
-            syncStatusRepository.save(status);
-            sseRegistry.sendStatus(userId, status);
-
-            try {
-                log.info("Syncing Adzuna jobs for '{}', user {} ({}/{})", currentSkill, userId, step, totalSteps);
-                jobService.fetchAndSyncAdzunaJobs(currentSkill, location, userId);
-                Thread.sleep(1000); // Rate limit mitigation
-            } catch (Exception e) {
-                log.error("Adzuna sync failed for skill '{}' for user {}: {}", currentSkill, userId, e.getMessage());
-            }
-
-            // --- Source 2: Remotive ---
-            step++;
-            status.setCurrentSkill(currentSkill + " (Remotive)");
-            status.setProgress(step);
-            status.setLastUpdated(LocalDateTime.now());
-            syncStatusRepository.save(status);
-            sseRegistry.sendStatus(userId, status);
-
-            try {
-                log.info("Syncing Remotive jobs for '{}', user {} ({}/{})", currentSkill, userId, step, totalSteps);
-                jobService.fetchAndSyncRemotiveJobs(currentSkill, userId);
-                Thread.sleep(1000);
-            } catch (Exception e) {
-                log.error("Remotive sync failed for skill '{}' for user {}: {}", currentSkill, userId, e.getMessage());
-            }
-
-            // --- Source 3: JSearch (RapidAPI) ---
-            step++;
-            status.setCurrentSkill(currentSkill + " (JSearch)");
-            status.setProgress(step);
-            status.setLastUpdated(LocalDateTime.now());
-            syncStatusRepository.save(status);
-            sseRegistry.sendStatus(userId, status);
-
-            try {
-                log.info("Syncing JSearch jobs for '{}', user {} ({}/{})", currentSkill, userId, step, totalSteps);
-                jobService.fetchAndSyncJSearchJobs(currentSkill, location, userId);
+        // Process skills in parallel using a thread pool.
+        // We use a list of CompletableFutures to manage concurrency.
+        List<java.util.concurrent.CompletableFuture<Void>> skillFutures = targetSkills.stream()
+            .map(currentSkill -> java.util.concurrent.CompletableFuture.runAsync(() -> {
+                log.info("Starting parallel sync for skill: {}", currentSkill);
                 
-                // Rate limit mitigation between skills
-                if (i < targetSkills.size() - 1) {
-                    Thread.sleep(1500);
+                for (String loc : finalLocations) {
+                    String locDisplay = loc.isEmpty() ? "anywhere" : loc;
+                    
+                    // Further parallelize Adzuna and JSearch for this skill/location
+                    java.util.concurrent.CompletableFuture<Void> adzunaFuture = java.util.concurrent.CompletableFuture.runAsync(() -> {
+                        try {
+                            adzunaSemaphore.acquire();
+                            int currentStep = stepCounter.incrementAndGet();
+                            updateStatusProgress(userId, currentSkill + " in " + locDisplay + " (Adzuna)", currentStep, totalSteps);
+                            jobService.fetchAndSyncAdzunaJobs(currentSkill, loc, userId);
+                            Thread.sleep(1000); // Wait 1s between Adzuna calls to avoid rate limits
+                        } catch (Exception e) {
+                            log.error("Adzuna sync failed for '{}' in {}: {}", currentSkill, loc, e.getMessage());
+                        } finally {
+                            adzunaSemaphore.release();
+                        }
+                    });
+
+                    java.util.concurrent.CompletableFuture<Void> jSearchFuture = java.util.concurrent.CompletableFuture.runAsync(() -> {
+                        try {
+                            jSearchSemaphore.acquire();
+                            int currentStep = stepCounter.incrementAndGet();
+                            updateStatusProgress(userId, currentSkill + " in " + locDisplay + " (JSearch)", currentStep, totalSteps);
+                            jobService.fetchAndSyncJSearchJobs(currentSkill, loc, userId);
+                            Thread.sleep(500); // Wait 0.5s between JSearch calls
+                        } catch (Exception e) {
+                            log.error("JSearch sync failed for '{}' in {}: {}", currentSkill, loc, e.getMessage());
+                        } finally {
+                            jSearchSemaphore.release();
+                        }
+                    });
+
+                    java.util.concurrent.CompletableFuture.allOf(adzunaFuture, jSearchFuture).join();
                 }
-            } catch (Exception e) {
-                log.error("JSearch sync failed for skill '{}' for user {}: {}", currentSkill, userId, e.getMessage());
-            }
-        }
+
+                // Remotive (Location agnostic)
+                int remotiveStep = stepCounter.incrementAndGet();
+                updateStatusProgress(userId, currentSkill + " (Remotive)", remotiveStep, totalSteps);
+                try {
+                    jobService.fetchAndSyncRemotiveJobs(currentSkill, userId);
+                } catch (Exception e) {
+                    log.error("Remotive sync failed for '{}': {}", currentSkill, e.getMessage());
+                }
+            }))
+            .collect(Collectors.toList());
+
+        // Wait for all skill searches to complete
+        java.util.concurrent.CompletableFuture.allOf(skillFutures.toArray(new java.util.concurrent.CompletableFuture[0])).join();
 
         status.setStatus(JobSyncStatus.SyncStatus.COMPLETED);
         status.setCurrentSkill(null);
@@ -119,6 +130,18 @@ public class JobSyncService {
         syncStatusRepository.save(status);
         sseRegistry.sendStatus(userId, status);
         log.info("Multi-source background job sync completed for user: {}", userId);
+    }
+
+    private synchronized void updateStatusProgress(String userId, String skill, int step, int total) {
+        JobSyncStatus status = syncStatusRepository.findById(userId)
+                .orElse(JobSyncStatus.builder().userId(userId).build());
+        status.setCurrentSkill(skill);
+        status.setProgress(step);
+        status.setTotal(total);
+        status.setStatus(JobSyncStatus.SyncStatus.SYNCING);
+        status.setLastUpdated(LocalDateTime.now());
+        syncStatusRepository.save(status);
+        sseRegistry.sendStatus(userId, status);
     }
 
     public JobSyncStatus getSyncStatus(String userId) {
