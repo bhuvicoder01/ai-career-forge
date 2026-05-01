@@ -26,6 +26,6 @@ public class JobSyncStatus {
     private LocalDateTime lastUpdated;
 
     public enum SyncStatus {
-        IDLE, SYNCING, COMPLETED, FAILED
+        IDLE, SYNCING, MATCHING, COMPLETED, FAILED
     }
 }

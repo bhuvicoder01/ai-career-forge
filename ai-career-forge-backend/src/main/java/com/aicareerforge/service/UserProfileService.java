@@ -3,12 +3,14 @@ package com.aicareerforge.service;
 import com.aicareerforge.model.UserProfile;
 import com.aicareerforge.repository.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import java.io.IOException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserProfileService {
@@ -34,15 +36,24 @@ public class UserProfileService {
      * A user needs onboarding if they have no resume and no skills extracted.
      */
     public boolean needsOnboarding(String userId) {
-        UserProfile profile = getProfile(userId);
+        UserProfile profile = userProfileRepository.findByUserId(userId).orElse(null);
+        if (profile == null) return true;
         boolean hasResume = profile.getResumeS3Url() != null && !profile.getResumeS3Url().isBlank();
         boolean hasSkills = profile.getSkills() != null && !profile.getSkills().isEmpty();
         return !hasResume && !hasSkills;
     }
 
     public UserProfile updateProfile(String userId, UserProfile updatedData) {
-        UserProfile profile = getProfile(userId);
+        UserProfile profile = userProfileRepository.findByUserId(userId)
+                .orElse(UserProfile.builder().userId(userId).build());
+        if (updatedData.getFullName() != null) profile.setFullName(updatedData.getFullName());
+        if (updatedData.getHeadline() != null) profile.setHeadline(updatedData.getHeadline());
+        if (updatedData.getBio() != null) profile.setBio(updatedData.getBio());
         if (updatedData.getSkills() != null) profile.setSkills(updatedData.getSkills());
+        if (updatedData.getExperiences() != null) profile.setExperiences(updatedData.getExperiences());
+        if (updatedData.getInternships() != null) profile.setInternships(updatedData.getInternships());
+        if (updatedData.getAcademicProjects() != null) profile.setAcademicProjects(updatedData.getAcademicProjects());
+        if (updatedData.getCertifications() != null) profile.setCertifications(updatedData.getCertifications());
         if (updatedData.getParsedGoals() != null) profile.setParsedGoals(updatedData.getParsedGoals());
         if (updatedData.getPreferredLocation() != null) profile.setPreferredLocation(updatedData.getPreferredLocation());
         if (updatedData.getPreferredSalary() != null) profile.setPreferredSalary(updatedData.getPreferredSalary());
@@ -55,8 +66,43 @@ public class UserProfileService {
         return profile;
     }
 
+    public UserProfile uploadProfilePhoto(String userId, MultipartFile file) {
+        log.info("Starting profile photo upload for user: {}", userId);
+        UserProfile profile = userProfileRepository.findByUserId(userId)
+                .orElse(UserProfile.builder().userId(userId).build());
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+            log.debug("Read {} bytes from uploaded photo", bytes.length);
+        } catch (IOException e) {
+            log.error("Failed to read photo bytes", e);
+            throw new RuntimeException("Failed to read file", e);
+        }
+        
+        String s3Key;
+        try {
+            s3Key = s3Service.uploadFile(bytes, file.getOriginalFilename(), userId, "photos");
+            log.info("Photo uploaded to S3 with key: {}", s3Key);
+        } catch (Exception e) {
+            log.error("S3 upload failed during photo upload", e);
+            throw e;
+        }
+
+        try {
+            String presignedUrl = s3Service.getPresignedUrl(s3Key);
+            profile.setProfilePhotoUrl(presignedUrl);
+            UserProfile saved = userProfileRepository.save(profile);
+            log.info("Profile photo URL saved to database for user: {}", userId);
+            return saved;
+        } catch (Exception e) {
+            log.error("Database update failed after photo upload", e);
+            throw new RuntimeException("Failed to save profile photo URL to database", e);
+        }
+    }
+
     public UserProfile uploadResume(String userId, MultipartFile file) {
-        UserProfile profile = getProfile(userId);
+        UserProfile profile = userProfileRepository.findByUserId(userId)
+                .orElse(UserProfile.builder().userId(userId).build());
         byte[] bytes;
         try {
             bytes = file.getBytes();

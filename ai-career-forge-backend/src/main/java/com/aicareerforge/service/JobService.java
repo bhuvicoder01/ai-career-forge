@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -55,8 +57,12 @@ public class JobService {
         for (var adzunaJob : adzunaJobs) {
             String sourceJobId = "adzuna-" + adzunaJob.getId();
             
-            // Skip if this user already has this job
-            if (jobRepository.existsBySourceJobIdAndUserId(sourceJobId, userId)) {
+            // Skip if this user already has this job (or if it's a global job and already exists)
+            boolean exists = (userId != null) 
+                ? jobRepository.existsBySourceJobIdAndUserId(sourceJobId, userId)
+                : jobRepository.existsBySourceJobIdAndUserIdIsNull(sourceJobId);
+                
+            if (exists) {
                 continue;
             }
             
@@ -97,8 +103,12 @@ public class JobService {
         for (RemotiveJobResponse.RemotiveJobDto remotiveJob : remotiveJobs) {
             String sourceJobId = "remotive-" + remotiveJob.getId();
             
-            // Skip if this user already has this job
-            if (jobRepository.existsBySourceJobIdAndUserId(sourceJobId, userId)) {
+            // Skip if this user already has this job (or if it's a global job and already exists)
+            boolean exists = (userId != null) 
+                ? jobRepository.existsBySourceJobIdAndUserId(sourceJobId, userId)
+                : jobRepository.existsBySourceJobIdAndUserIdIsNull(sourceJobId);
+                
+            if (exists) {
                 continue;
             }
             
@@ -162,8 +172,12 @@ public class JobService {
         for (var jJob : jSearchJobs) {
             String sourceJobId = "jsearch-" + jJob.getJobId();
             
-            // Skip if this user already has this job
-            if (jobRepository.existsBySourceJobIdAndUserId(sourceJobId, userId)) {
+            // Skip if this user already has this job (or if it's a global job and already exists)
+            boolean exists = (userId != null) 
+                ? jobRepository.existsBySourceJobIdAndUserId(sourceJobId, userId)
+                : jobRepository.existsBySourceJobIdAndUserIdIsNull(sourceJobId);
+                
+            if (exists) {
                 continue;
             }
             
@@ -245,11 +259,41 @@ public class JobService {
 
     @org.springframework.scheduling.annotation.Scheduled(cron = "0 0 */6 * * *") // Every 6 hours
     public void scheduledJobSync() {
-        log.info("Starting scheduled job sync...");
-        // In a real scenario, we might iterate through popular categories or user interests
-        fetchAndSyncJobs("Software Engineer", "Remote");
-        fetchAndSyncJobs("Data Scientist", "");
-        fetchAndSyncJobs("AI Engineer", "");
+        log.info("Starting scheduled universal job sync...");
+        
+        List<String> keywords = List.of(
+            "Software Engineer", "Frontend Developer", "Backend Developer", "Fullstack Developer",
+            "Data Scientist", "AI Engineer", "Machine Learning Engineer", "DevOps Engineer",
+            "Product Manager", "UI/UX Designer", "Cybersecurity Analyst", "Cloud Architect",
+            "Mobile Developer", "Java Developer", "Python Developer", "React Developer",
+            "Node.js Developer", "Embedded Systems Engineer", "Quality Assurance Engineer"
+        );
+
+        for (String keyword : keywords) {
+            try {
+                // Fetch from multiple sources universally
+                fetchAndSyncAdzunaJobs(keyword, "", null);
+                fetchAndSyncRemotiveJobs(keyword, null);
+                fetchAndSyncJSearchJobs(keyword, "Remote", null);
+                
+                // Throttle slightly to avoid aggressive rate limiting during the big sync
+                Thread.sleep(2000); 
+            } catch (Exception e) {
+                log.error("Failed universal sync for keyword {}: {}", keyword, e.getMessage());
+            }
+        }
+        log.info("Scheduled universal job sync completed.");
+    }
+
+    /**
+     * Trigger the first universal sync immediately when the server starts.
+     * This ensures the "Jobs Pool" is populated even if the scheduled cron hasn't fired yet.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    @Async("taskExecutor")
+    public void onApplicationReady() {
+        log.info("Application is ready. Triggering initial universal job sync...");
+        scheduledJobSync();
     }
 
     public List<Job> getRecommendedJobs(UserProfile profile) {
@@ -281,8 +325,7 @@ public class JobService {
             log.info("Vector search returned 0 results, falling back to stored jobs for user.");
             return getFallbackJobs(profile);
         }
-        
-        return documents.stream()
+        List<Job> allMatchedJobs = documents.stream()
                 .map(doc -> {
                     String jobId = (String) doc.getMetadata().get("jobId");
                     if (jobId == null) return null;
@@ -295,10 +338,7 @@ public class JobService {
                             return null; // Skip jobs belonging to other users
                         }
                         
-                        // --- Multi-factor Match Score (65-100 range) ---
-                        double baseScore = 70.0;
-
-                        // Use extracted scoring logic
+                        // --- Multi-factor Match Score ---
                         Double vectorSimilarity = 0.0;
                         Object distance = doc.getMetadata().get("distance");
                         if (distance instanceof Double d) {
@@ -313,48 +353,94 @@ public class JobService {
                         Double finalScore = calculateMatchScore(job, profile, vectorSimilarity);
                         job.setMatchScore(finalScore);
                         
-                        // Cache the score for consistency across individual job views
                         if (profile.getUserId() != null) {
                             scoreCache.computeIfAbsent(profile.getUserId(), k -> new ConcurrentHashMap<>())
                                       .put(job.getId(), finalScore);
                         }
                         
-                        // Only generate explanation if not already cached
                         if (job.getRelevanceExplanation() == null || job.getRelevanceExplanation().isBlank()) {
                             try {
                                 job.setRelevanceExplanation(recommendationAgent.generateRelevanceExplanation(job, userProfileData));
-                                jobRepository.save(job); // Persist so it's cached for next time
+                                jobRepository.save(job);
                             } catch (Exception e) {
                                 job.setRelevanceExplanation("Strong alignment with your current skill set and career trajectory.");
                             }
                         }
-                        
-                        log.debug("Matched job: {} with score: {}", job.getTitle(), job.getMatchScore());
                     }
                     return job;
                 })
                 .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        
+        return deduplicateJobs(allMatchedJobs);
+    }
+
+    /**
+     * Ensures a list of jobs has unique IDs, keeping the one with the highest match score.
+     */
+    private List<Job> deduplicateJobs(List<Job> jobs) {
+        if (jobs == null) return List.of();
+        
+        return jobs.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(
+                    Job::getId,
+                    job -> job,
+                    (existing, replacement) -> existing.getMatchScore() > replacement.getMatchScore() ? existing : replacement,
+                    java.util.LinkedHashMap::new
+                ))
+                .values()
+                .stream()
                 .sorted((a, b) -> Double.compare(b.getMatchScore(), a.getMatchScore()))
                 .collect(Collectors.toList());
     }
 
     /**
-     * Fallback: Return the user's stored jobs directly from MongoDB with skill-based scoring.
-     * Used when the embedding API is unavailable or vector search returns no results.
+     * Fallback: Return jobs from MongoDB with skill-based scoring.
+     * Used when the embedding API is unavailable (e.g. 429 Too Many Requests) or vector search returns no results.
+     * Now includes both user-specific jobs and the global job pool.
      */
     private List<Job> getFallbackJobs(UserProfile profile) {
         String userId = profile.getUserId();
-        if (userId == null) return List.of();
+        
+        log.info("Fallback: Searching for jobs in MongoDB for user {} based on skills", userId);
+        
+        List<Job> candidateJobs = new ArrayList<>();
+        
+        // 1. Fetch user-specific jobs
+        if (userId != null) {
+            candidateJobs.addAll(jobRepository.findByUserId(userId));
+        }
+        
+        // 2. Fetch jobs from the global pool that match at least one skill
+        // We limit this to avoid loading thousands of jobs into memory
+        if (profile.getSkills() != null && !profile.getSkills().isEmpty()) {
+            for (String skill : profile.getSkills().stream().limit(5).collect(Collectors.toList())) {
+                if (skill.length() < 3) continue;
+                // Simple case-insensitive search for the skill in title or description
+                List<Job> skillMatches = jobRepository.findFallbackJobs(skill);
+                for (Job sj : skillMatches) {
+                    if (candidateJobs.stream().noneMatch(j -> j.getId().equals(sj.getId()))) {
+                        candidateJobs.add(sj);
+                    }
+                }
+                if (candidateJobs.size() > 100) break; // Don't over-fetch
+            }
+        }
+        
+        // 3. If still very few jobs, just get some recent global jobs
+        if (candidateJobs.size() < 10) {
+            candidateJobs.addAll(jobRepository.findTop50ByUserIdIsNullOrderByPostedDateDesc());
+        }
 
-        List<Job> userJobs = jobRepository.findByUserId(userId);
-        log.info("Fallback: returning {} stored jobs for user {}", userJobs.size(), userId);
+        log.info("Fallback: found {} candidate jobs for scoring", candidateJobs.size());
 
-        for (Job job : userJobs) {
+        for (Job job : candidateJobs) {
             Double score = calculateMatchScore(job, profile, 0.5); // Moderate baseline similarity
             job.setMatchScore(score);
 
-            if (profile.getUserId() != null) {
-                scoreCache.computeIfAbsent(profile.getUserId(), k -> new ConcurrentHashMap<>())
+            if (userId != null) {
+                scoreCache.computeIfAbsent(userId, k -> new ConcurrentHashMap<>())
                           .put(job.getId(), score);
             }
 
@@ -363,8 +449,7 @@ public class JobService {
             }
         }
 
-        userJobs.sort((a, b) -> Double.compare(b.getMatchScore(), a.getMatchScore()));
-        return userJobs;
+        return deduplicateJobs(candidateJobs).stream().limit(50).collect(Collectors.toList());
     }
 
     public double calculateMatchScore(Job job, UserProfile profile, Double vectorSimilarity) {
@@ -514,8 +599,8 @@ public class JobService {
                 return existingJob;
             }
         } else {
-            // Legacy global dedup (for scheduled sync / manual search)
-            Job existingJob = jobRepository.findBySourceJobId(job.getSourceJobId()).orElse(null);
+            // Global dedup: check by sourceJobId where userId is null
+            Job existingJob = jobRepository.findBySourceJobIdAndUserIdIsNull(job.getSourceJobId()).orElse(null);
             if (existingJob == null) {
                 Job savedJob = jobRepository.save(job);
                 recommendationAgent.indexJob(savedJob);
@@ -559,6 +644,8 @@ public class JobService {
     public void enrichAndIndexJobAsync(Job job) {
         try {
             enrichmentSemaphore.acquire();
+            // Throttle: avoid hitting embedding API rate limits by spacing out background indexing
+            Thread.sleep(3000); 
             log.debug("Background enrichment started for: {} at {}", job.getTitle(), job.getCompany());
             
             // 1. Fetch Culture Insights (AI)

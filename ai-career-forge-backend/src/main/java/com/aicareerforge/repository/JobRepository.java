@@ -11,9 +11,15 @@ import java.util.Optional;
 public interface JobRepository extends MongoRepository<Job, String> {
     boolean existsBySourceJobId(String sourceJobId);
     boolean existsBySourceJobIdAndUserId(String sourceJobId, String userId);
+    boolean existsBySourceJobIdAndUserIdIsNull(String sourceJobId);
     Optional<Job> findBySourceJobId(String sourceJobId);
     Optional<Job> findBySourceJobIdAndUserId(String sourceJobId, String userId);
+    Optional<Job> findBySourceJobIdAndUserIdIsNull(String sourceJobId);
     List<Job> findByUserId(String userId);
+    @org.springframework.data.mongodb.repository.Query("{ 'userId': null, '$or': [ { 'title': { '$regex': ?0, '$options': 'i' } }, { 'description': { '$regex': ?0, '$options': 'i' } } ] }")
+    List<Job> findFallbackJobs(String skill);
+
+    List<Job> findTop50ByUserIdIsNullOrderByPostedDateDesc();
     void deleteAllByUserId(String userId);
 }
 

@@ -43,7 +43,10 @@ public class JobRecommendationAgent {
             "type", "job_listing"
         ));
         
-        vectorStore.add(List.of(document));
+        executeWithRetry(() -> {
+            vectorStore.add(List.of(document));
+            return null;
+        }, "Indexing Job " + job.getId());
     }
 
     public List<Document> searchSimilarJobs(String userProfileText) {
@@ -53,15 +56,32 @@ public class JobRecommendationAgent {
             return List.of();
         }
 
-        // Setting threshold to 0.0 for debugging - this will return all results sorted by similarity.
-        // If it still returns 0, the issue is with the MongoDB Search Index or document visibility.
         SearchRequest searchRequest = SearchRequest.query(userProfileText)
                 .withTopK(50)
                 .withSimilarityThreshold(0.0); 
                 
-        List<Document> results = vectorStore.similaritySearch(searchRequest);
-        log.info("Vector store returned {} results for query length: {}", results.size(), userProfileText.length());
-        return results;
+        return executeWithRetry(() -> vectorStore.similaritySearch(searchRequest), "Similarity Search");
+    }
+
+    private <T> T executeWithRetry(java.util.function.Supplier<T> action, String operationName) {
+        int maxRetries = 3;
+        int attempt = 0;
+        while (attempt < maxRetries) {
+            try {
+                return action.get();
+            } catch (Exception e) {
+                attempt++;
+                if (e.getMessage() != null && e.getMessage().contains("429") && attempt < maxRetries) {
+                    long waitTime = (long) Math.pow(2, attempt) * 5000; // 10s, 20s...
+                    log.warn("{} failed due to rate limit (429). Retrying in {}ms (Attempt {}/{})", 
+                        operationName, waitTime, attempt, maxRetries);
+                    try { Thread.sleep(waitTime); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                } else {
+                    throw e;
+                }
+            }
+        }
+        return action.get(); // Final attempt if somehow logic above falls through
     }
 
     public String generateRelevanceExplanation(Job job, String userProfileText) {

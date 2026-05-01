@@ -33,6 +33,11 @@ public class UserProfileController {
         return ResponseEntity.ok(userProfileService.uploadResume(user.getId(), file));
     }
 
+    @PostMapping("/photo")
+    public ResponseEntity<UserProfile> uploadPhoto(@AuthenticationPrincipal User user, @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(userProfileService.uploadProfilePhoto(user.getId(), file));
+    }
+
     /**
      * Combined onboarding endpoint: resume upload + career preferences.
      * Accepts multipart form data with optional resume file and preference fields.

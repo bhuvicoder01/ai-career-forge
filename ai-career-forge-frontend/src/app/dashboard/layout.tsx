@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { 
   User, Briefcase, FileText, CheckCircle, LogOut, Menu, X,
-  LayoutDashboard, ClipboardList, BrainCircuit, Loader2, Sun, Moon, TrendingUp 
+  LayoutDashboard, ClipboardList, BrainCircuit, Loader2, Sun, Moon, TrendingUp, Settings 
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
@@ -19,15 +19,16 @@ import api from "@/lib/api";
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const logout = useAuthStore((state) => state.logout);
+  const { user, logout } = useAuthStore();
 
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [apps, setApps] = useState<any[]>([]);
+  const [profile, setProfile] = useState<any>(null);
 
   // Global SSE connection for sync status
   const { syncStatus, connect, disconnect } = useSyncStore();
-  const isSyncing = syncStatus.status === 'SYNCING';
+  const isSyncing = syncStatus.status === 'SYNCING' || syncStatus.status === 'MATCHING';
 
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -36,6 +37,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     setMounted(true);
     fetchApps();
+    fetchProfile();
   }, []);
 
   const fetchApps = async () => {
@@ -44,6 +46,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setApps(res.data);
     } catch (err) {
       console.error("DashboardLayout: Failed to fetch apps:", err);
+    }
+  };
+
+  const fetchProfile = async () => {
+    try {
+      const res = await api.get("/profile");
+      setProfile(res.data);
+    } catch (err) {
+      console.error("DashboardLayout: Failed to fetch profile:", err);
     }
   };
 
@@ -74,9 +85,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [pathname]);
 
   const navLinks = [
-    { href: "/dashboard", label: "Profile", icon: User },
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/jobs", label: "Job Matches", icon: Briefcase },
     { href: "/dashboard/applications", label: "Tracker", icon: CheckCircle },
+    // { href: "/dashboard/profile", label: "Profile", icon: User },
+    { href: "/dashboard/settings", label: "Settings", icon: Settings },
   ];
 
   return (
@@ -93,7 +106,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   alt="Zenith" 
                   width={100} 
                   height={38} 
-                  className="object-contain" 
+                  className="w-auto h-auto" 
+                  priority
                 />
               </div>
             </Link>
@@ -125,21 +139,49 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </Link>
               ))}
               
-              <div className="mt-auto space-y-4 pt-6 border-t border-border/50">
-                <div className="flex items-center gap-3">
-                    <TrendingUp className="w-5 h-5 text-muted-foreground" />
-                    <div>
-                        <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Active Ops</div>
-                        <div className="text-xl font-black text-foreground">{apps.filter(a => a.status === 'APPLIED' || a.status === 'INTERVIEW').length}</div>
-                    </div>
-                </div>
-                
-                <button 
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-destructive/10 text-destructive font-bold transition-colors"
+              <div className="mt-auto space-y-6 pt-6 border-t border-border/50">
+                <Link 
+                  href="/dashboard/profile"
+                  className="flex items-center gap-3 p-2 rounded-2xl hover:bg-secondary/50 transition-all group"
                 >
-                  <LogOut className="w-5 h-5" /> Logout
-                </button>
+                  <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-border group-hover:border-primary/50 transition-colors relative">
+                    {profile?.profilePhotoUrl ? (
+                      <Image 
+                        src={profile.profilePhotoUrl} 
+                        alt="Profile" 
+                        fill 
+                        className="object-cover" 
+                        sizes="48px"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-secondary flex items-center justify-center">
+                        <User className="w-6 h-6 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-black truncate text-foreground">{profile?.fullName || user?.name || "Career Forge User"}</div>
+                    <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest truncate">{profile?.headline || "Professional"}</div>
+                  </div>
+                </Link>
+
+                <div className="flex items-center justify-between px-2">
+                  <div className="flex items-center gap-3">
+                      <TrendingUp className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                          <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Active Ops</div>
+                          <div className="text-xl font-black text-foreground">{apps.filter(a => a.status === 'APPLIED' || a.status === 'INTERVIEW').length}</div>
+                      </div>
+                  </div>
+                  
+                  <button 
+                    onClick={handleLogout}
+                    className="p-3 rounded-xl hover:bg-destructive/10 text-destructive transition-colors"
+                    title="Logout"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -165,7 +207,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     alt="Zenith" 
                     width={100} 
                     height={38} 
-                    className="object-contain" 
+                    className="w-auto h-auto" 
                   />
 
               <div className="flex flex-col space-y-4">
@@ -184,13 +226,49 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 ))}
               </div>
 
-              <div className="mt-auto pt-6 border-t border-white/10 flex flex-col gap-4">
-                <button 
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl hover:bg-red-500/10 text-red-500 font-medium transition-colors"
+              <div className="mt-auto pt-6 border-t border-white/10 flex flex-col gap-6">
+                <Link 
+                  href="/dashboard/profile"
+                  className="flex items-center gap-3 p-2 rounded-2xl bg-white/5"
+                  onClick={() => setIsSidebarOpen(false)}
                 >
-                  <LogOut className="w-6 h-6" /> Logout
-                </button>
+                  <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 relative">
+                    {profile?.profilePhotoUrl ? (
+                      <Image 
+                        src={profile.profilePhotoUrl} 
+                        alt="Profile" 
+                        fill 
+                        className="object-cover" 
+                        sizes="40px"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-white/5 flex items-center justify-center">
+                        <User className="w-5 h-5 text-white/50" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-black truncate text-white">{profile?.fullName || user?.name || "User"}</div>
+                    <div className="text-[8px] font-black text-white/40 uppercase tracking-widest truncate">{profile?.headline || "Pro"}</div>
+                  </div>
+                </Link>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                      <TrendingUp className="w-5 h-5 text-white/50" />
+                      <div>
+                          <div className="text-[10px] font-black text-white/40 uppercase tracking-widest">Active</div>
+                          <div className="text-lg font-black text-white">{apps.filter(a => a.status === 'APPLIED' || a.status === 'INTERVIEW').length}</div>
+                      </div>
+                  </div>
+                  
+                  <button 
+                    onClick={handleLogout}
+                    className="p-3 rounded-xl bg-red-500/10 text-red-500 transition-colors"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
             </div>
@@ -203,9 +281,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="mb-6 flex position-sticky items-center gap-3 bg-secondary border border-border text-foreground px-5 py-3 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm">
               <Loader2 className="w-5 h-5 animate-spin" />
               <div className="flex-1">
-                <p className="text-sm font-black">Agent Synchronization</p>
+                <p className="text-sm font-black">
+                  {syncStatus.status === 'MATCHING' ? 'Skill Matching Engine' : 'Agent Synchronization'}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Syncing {syncStatus.currentSkill || 'roles'}... ({syncStatus.progress}/{syncStatus.total})
+                  {syncStatus.status === 'MATCHING' ? 'Matching ' : 'Syncing '} 
+                  {syncStatus.currentSkill || 'roles'}... ({syncStatus.progress}/{syncStatus.total})
                 </p>
               </div>
               <div className="text-xs font-mono bg-foreground/5 px-2 py-1 rounded-lg border border-border">
