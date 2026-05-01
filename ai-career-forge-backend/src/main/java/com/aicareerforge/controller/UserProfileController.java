@@ -38,6 +38,21 @@ public class UserProfileController {
         return ResponseEntity.ok(userProfileService.uploadProfilePhoto(user.getId(), file));
     }
 
+    @PostMapping("/cover")
+    public ResponseEntity<UserProfile> uploadCover(@AuthenticationPrincipal User user, @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(userProfileService.uploadCoverImage(user.getId(), file));
+    }
+
+    @PostMapping("/cover/predefined")
+    public ResponseEntity<UserProfile> setPredefinedCover(@AuthenticationPrincipal User user, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(userProfileService.setPredefinedCover(user.getId(), body.get("imageUrl")));
+    }
+
+    @PostMapping("/cover/ai")
+    public ResponseEntity<UserProfile> generateAiCover(@AuthenticationPrincipal User user, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(userProfileService.generateAiCover(user.getId(), body.getOrDefault("style", "professional")));
+    }
+
     /**
      * Combined onboarding endpoint: resume upload + career preferences.
      * Accepts multipart form data with optional resume file and preference fields.

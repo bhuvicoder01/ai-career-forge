@@ -37,6 +37,7 @@ interface UserProfile {
   headline: string;
   bio: string;
   profilePhotoUrl: string;
+  coverImageUrl: string;
   skills: string[];
   experiences: Experience[];
   academicProjects: AcademicProject[];
@@ -60,22 +61,27 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
+  const [isCoverCropModalOpen, setIsCoverCropModalOpen] = useState(false);
+  const [isGeneratingAiCover, setIsGeneratingAiCover] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [coverToCrop, setCoverToCrop] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [canRenderCropper, setCanRenderCropper] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isCropModalOpen) {
+    if (isCropModalOpen || isCoverCropModalOpen) {
       const timer = setTimeout(() => setCanRenderCropper(true), 200);
       return () => {
         clearTimeout(timer);
         setCanRenderCropper(false);
       };
     }
-  }, [isCropModalOpen]);
+  }, [isCropModalOpen, isCoverCropModalOpen]);
 
   useEffect(() => {
     fetchProfile();
@@ -91,6 +97,14 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const hydrateUrl = (url: string) => {
+    if (!url || !url.startsWith("http")) return url;
+    if (url.includes("pollinations.ai") || url.includes("image.pollinations.ai") || url.includes("unsplash.com")) {
+      return `http://localhost:8080/api/v1/public/external/proxy?url=${encodeURIComponent(url)}`;
+    }
+    return url;
   };
 
   const handleSave = async () => {
@@ -186,6 +200,94 @@ export default function ProfilePage() {
     }
   };
 
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      setCoverToCrop(reader.result as string);
+      setIsCoverCropModalOpen(true);
+      setIsCoverModalOpen(false);
+    });
+    reader.readAsDataURL(file);
+  };
+
+  const handleCoverCropSave = async () => {
+    if (!coverToCrop || !croppedAreaPixels || !croppedAreaPixels.width || isNaN(croppedAreaPixels.width)) {
+      toast.error("Please wait for the cropper to initialize...");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const croppedBlob = await getCroppedImg(coverToCrop, croppedAreaPixels);
+      if (!croppedBlob) throw new Error("Failed to crop cover");
+
+      const formData = new FormData();
+      formData.append("file", croppedBlob, "cover-image.jpg");
+
+      const res = await api.post("/profile/cover", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      setProfile(prev => prev ? { ...prev, coverImageUrl: res.data.coverImageUrl } : null);
+      toast.success("Cover image updated");
+      setIsCoverCropModalOpen(false);
+      setCoverToCrop(null);
+    } catch (err) {
+      toast.error("Failed to upload cropped cover");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handlePredefinedCover = async (url: string) => {
+    setUploading(true);
+    try {
+      const res = await api.post("/profile/cover/predefined", { imageUrl: url });
+      setProfile(prev => prev ? { ...prev, coverImageUrl: res.data.coverImageUrl } : null);
+      toast.success("Cover updated");
+      setIsCoverModalOpen(false);
+    } catch (err) {
+      toast.error("Failed to set cover");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const [isAiCooldown, setIsAiCooldown] = useState(false);
+
+  const handleAiCover = async (style: string) => {
+    if (isAiCooldown) {
+      toast.error("Please wait a moment before generating again");
+      return;
+    }
+    setIsGeneratingAiCover(true);
+    try {
+      const res = await api.post("/profile/cover/ai", { style });
+      setProfile(prev => prev ? { ...prev, coverImageUrl: res.data.coverImageUrl } : null);
+      toast.success("AI Cover generated!");
+      
+      // Start cooldown
+      setIsAiCooldown(true);
+      setTimeout(() => setIsAiCooldown(false), 5000);
+      
+      setIsCoverModalOpen(false);
+    } catch (err) {
+      toast.error("AI generation failed or service busy");
+    } finally {
+      setIsGeneratingAiCover(false);
+    }
+  };
+
+  const handleCropCurrentCover = () => {
+    if (!profile?.coverImageUrl) return;
+    setCoverToCrop(profile.coverImageUrl);
+    setIsCoverCropModalOpen(true);
+    setIsCoverModalOpen(false);
+  };
+
   const addSkill = (skill: string) => {
     if (!profile || !skill.trim() || profile.skills.includes(skill.trim())) return;
     setProfile({ ...profile, skills: [...profile.skills, skill.trim()] });
@@ -219,8 +321,33 @@ export default function ProfilePage() {
     <div className="max-w-6xl mx-auto space-y-10 pb-20">
       {/* Hero Header */}
       <div className="relative group">
-        <div className="h-48 rounded-3xl bg-gradient-to-r from-primary/20 via-primary/5 to-background border border-primary/10 overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(var(--primary-rgb),0.05),transparent_50%)]" />
+        <div className="h-64 rounded-3xl bg-secondary overflow-hidden relative border border-border shadow-2xl">
+          {profile.coverImageUrl ? (
+            <img 
+              src={profile.coverImageUrl} 
+              alt="Cover" 
+              crossOrigin="anonymous"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                console.error("Cover image failed to load:", profile.coverImageUrl);
+                // Fallback to gradient if image fails
+                setProfile(prev => prev ? { ...prev, coverImageUrl: "" } : null);
+              }}
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/5 to-background">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(var(--primary-rgb),0.05),transparent_50%)]" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end p-6">
+            <button 
+              onClick={() => setIsCoverModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-xl text-white font-bold transition-all text-sm shadow-lg"
+            >
+              <Camera className="w-4 h-4" />
+              Edit Cover
+            </button>
+          </div>
         </div>
         
         <div className="px-8 -mt-20 flex flex-col md:flex-row items-end gap-8 relative z-10">
@@ -593,21 +720,42 @@ export default function ProfilePage() {
 
       {/* View Modal */}
       {isViewModalOpen && profile.profilePhotoUrl && (
-        <div className="fixed inset-0 z-[2000] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-300">
-          <button 
-            onClick={() => setIsViewModalOpen(false)}
-            className="absolute top-10 right-10 p-4 bg-white/10 hover:bg-white/20 rounded-2xl text-white transition-all"
+        <div 
+          className="fixed inset-0 z-[2000] bg-black/20 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
+          onClick={() => setIsViewModalOpen(false)}
+        >
+          <div 
+            className="relative w-full max-w-md bg-card border-4 border-white/5 rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-300"
+            onClick={(e) => e.stopPropagation()}
           >
-            <X className="w-8 h-8" />
-          </button>
-          <div className="relative w-full max-w-4xl aspect-square md:aspect-video rounded-3xl overflow-hidden shadow-2xl">
-            <Image 
-              src={profile.profilePhotoUrl} 
-              alt="Full Profile Photo" 
-              fill 
-              className="object-contain"
-              sizes="100vw"
-            />
+            <div className="relative aspect-square">
+              <Image 
+                src={profile.profilePhotoUrl} 
+                alt={profile.fullName || "User"} 
+                fill 
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 448px"
+              />
+              
+              {/* Top Bar / Header */}
+              <div className="absolute top-0 inset-x-0 p-6 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between pointer-events-none">
+                <div className="flex flex-col">
+                  <span className="text-white font-black text-lg drop-shadow-md">{profile.fullName}</span>
+                  <span className="text-white/60 text-xs font-bold uppercase tracking-widest drop-shadow-md">Profile Photo</span>
+                </div>
+                <button 
+                  onClick={() => setIsViewModalOpen(false)}
+                  className="p-3 bg-white/10 hover:bg-white/20 backdrop-blur-xl rounded-2xl text-white transition-all pointer-events-auto border border-white/10"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Bottom Actions */}
+            <div className="p-4 bg-card border-t border-border flex items-center justify-center">
+               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Click anywhere outside to close</p>
+            </div>
           </div>
         </div>
       )}
@@ -675,6 +823,191 @@ export default function ProfilePage() {
                   Apply & Upload
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cover Crop Modal */}
+      {isCoverCropModalOpen && coverToCrop && (
+        <div className="fixed inset-0 z-[2000] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 animate-in fade-in zoom-in duration-300">
+          <div className="w-full max-w-4xl bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[80vh]">
+            <div className="p-6 border-b border-border flex items-center justify-between">
+              <h3 className="text-xl font-black uppercase tracking-tight">Crop Cover Image</h3>
+              <button onClick={() => setIsCoverCropModalOpen(false)} className="p-2 hover:bg-secondary rounded-xl transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 relative h-[400px] bg-black/20">
+              {canRenderCropper && (
+                <Cropper
+                  key={coverToCrop}
+                  image={coverToCrop}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={3/1}
+                  onCropChange={setCrop}
+                  onCropComplete={onCropComplete}
+                  onZoomChange={setZoom}
+                  onMediaLoaded={onMediaLoaded}
+                  cropShape="rect"
+                  showGrid={true}
+                />
+              )}
+            </div>
+
+            <div className="p-8 space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase text-muted-foreground">Zoom Level</span>
+                  <span className="text-xs font-black text-primary">{Math.round(zoom * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  value={zoom}
+                  min={1}
+                  max={3}
+                  step={0.1}
+                  aria-labelledby="Zoom"
+                  onChange={(e) => setZoom(Number(e.target.value))}
+                  className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setIsCoverCropModalOpen(false)}
+                  className="flex-1 py-4 bg-secondary text-secondary-foreground rounded-2xl font-black hover:bg-secondary/80 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCoverCropSave}
+                  disabled={uploading}
+                  className="flex-1 py-4 bg-primary text-primary-foreground rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-50"
+                >
+                  {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                  Apply & Upload
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cover Selection Modal */}
+      {isCoverModalOpen && (
+        <div className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="w-full max-w-4xl bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-xl">
+                  <Camera className="w-5 h-5 text-primary" />
+                </div>
+                <h3 className="text-xl font-black uppercase tracking-tight">Customize Cover</h3>
+              </div>
+              <button onClick={() => setIsCoverModalOpen(false)} className="p-2 hover:bg-secondary rounded-xl transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 space-y-10">
+              {/* Option 1: AI Generation */}
+              <section className="space-y-4">
+                <div className="flex items-center gap-2 text-primary font-black uppercase tracking-widest text-xs">
+                  <Sparkles className="w-4 h-4" /> AI Creator
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {["Professional", "Abstract", "Tech", "Nature"].map(style => (
+                    <button
+                      key={style}
+                      disabled={isGeneratingAiCover}
+                      onClick={() => handleAiCover(style)}
+                      className="group relative h-24 rounded-2xl border border-primary/20 hover:border-primary bg-primary/5 flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50 overflow-hidden"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <BrainCircuit className="w-6 h-6 text-primary group-hover:scale-110 transition-transform" />
+                      <span className="text-xs font-black uppercase">{style}</span>
+                      {isGeneratingAiCover && (
+                        <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                          <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              {/* Option 2: Curated Gallery */}
+              <section className="space-y-4">
+                <div className="flex items-center gap-2 text-violet-500 font-black uppercase tracking-widest text-xs">
+                  <Eye className="w-4 h-4" /> Curated Gallery
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {[
+                    "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=800",
+                    "https://images.unsplash.com/photo-1497215728101-856f4ea42174?q=80&w=800",
+                    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800",
+                    "https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=800",
+                    "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?q=80&w=800",
+                    "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=800"
+                  ].map((url, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handlePredefinedCover(url)}
+                      className="relative aspect-video rounded-2xl overflow-hidden border-2 border-transparent hover:border-primary transition-all hover:scale-[1.02] shadow-lg group"
+                    >
+                      <img 
+                        src={url.includes("http") ? hydrateUrl(url) : url} 
+                        alt={`Cover ${i}`} 
+                        crossOrigin="anonymous"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                      />
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              {/* Option 3: Manual Upload */}
+              <section className="space-y-4">
+                <div className="flex items-center gap-2 text-amber-500 font-black uppercase tracking-widest text-xs">
+                  <Plus className="w-4 h-4" /> Custom Upload
+                </div>
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-3xl hover:bg-secondary/50 transition-all cursor-pointer group">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <Camera className="w-8 h-8 text-muted-foreground group-hover:text-primary transition-colors mb-2" />
+                    <p className="text-sm font-bold text-muted-foreground">Drop image or click to browse</p>
+                  </div>
+                  <input type="file" className="hidden" accept="image/*" onChange={handleCoverUpload} />
+                </label>
+              </section>
+
+              {/* Option 4: Crop Current */}
+              {profile.coverImageUrl && (
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 text-sky-500 font-black uppercase tracking-widest text-xs">
+                    <Sparkles className="w-4 h-4" /> Refine Current
+                  </div>
+                  <button
+                    onClick={handleCropCurrentCover}
+                    className="w-full h-20 rounded-3xl border-2 border-sky-500/20 hover:border-sky-500 bg-sky-500/5 flex items-center justify-center gap-3 transition-all hover:scale-[1.01] group"
+                  >
+                    <Camera className="w-6 h-6 text-sky-500 group-hover:rotate-12 transition-transform" />
+                    <span className="text-sm font-black uppercase">Crop & Re-center Current Cover</span>
+                  </button>
+                </section>
+              )}
+            </div>
+            
+            <div className="p-6 border-t border-border flex justify-end">
+              <button 
+                onClick={() => setIsCoverModalOpen(false)}
+                className="px-6 py-2 bg-secondary text-secondary-foreground rounded-xl font-bold hover:bg-secondary/80 transition-all"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

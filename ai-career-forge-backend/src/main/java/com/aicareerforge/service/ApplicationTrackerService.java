@@ -1,4 +1,5 @@
 package com.aicareerforge.service;
+
 import com.aicareerforge.model.Application;
 import com.aicareerforge.model.User;
 import com.aicareerforge.model.UserProfile;
@@ -26,7 +27,9 @@ public class ApplicationTrackerService {
     private final S3Service s3Service;
 
     public List<Application> getUserApplications(String userId) {
-        return applicationRepository.findByUserId(userId);
+        List<Application> apps = applicationRepository.findByUserId(userId);
+        apps.forEach(this::hydrateUrls);
+        return apps;
     }
 
     public Application getApplication(String id, String userId) {
@@ -35,7 +38,24 @@ public class ApplicationTrackerService {
         if (!app.getUserId().equals(userId)) {
             throw new RuntimeException("Unauthorized to access this application");
         }
+        hydrateUrls(app);
         return app;
+    }
+
+    private void hydrateUrls(Application app) {
+        if (app == null) return;
+        app.setTailoredResumeS3Url(hydrateUrl(app.getTailoredResumeS3Url()));
+    }
+
+    private String hydrateUrl(String url) {
+        if (url == null || url.isBlank() || url.contains("preparing")) return url;
+        if (url.startsWith("http")) {
+            if (url.contains("pollinations.ai") || url.contains("unsplash.com")) {
+                return s3Service.getProxyUrl(url);
+            }
+            return url;
+        }
+        return s3Service.getPermanentUrl(url);
     }
 
     public Application createApplication(String userId, Application req) {
@@ -70,7 +90,7 @@ public class ApplicationTrackerService {
             app.setEmailIntroduction(commKit.get("emailIntro"));
 
             // 4. Pace again
-            Thread.sleep(2000);
+            Thread.sleep(2000); 
 
             // 5. Generate Interview Prep Kit
             String prepKit = prepAgent.generateInterviewPrepKit(jobDescription, company, profile.getRawResumeText());
@@ -91,7 +111,7 @@ public class ApplicationTrackerService {
             byte[] pdfBytes = pdfGenerationService.generatePdf(template, pdfParams);
             
             String s3Key = s3Service.uploadFile(pdfBytes, "tailored_resume.pdf", app.getUserId());
-            app.setTailoredResumeS3Url(s3Service.getPresignedUrl(s3Key));
+            app.setTailoredResumeS3Url(s3Key); // Store only the key
             
             app.setStatus(Application.Status.APPLIED);
             log.info("Materials successfully prepared for application: {}", applicationId);
@@ -101,7 +121,9 @@ public class ApplicationTrackerService {
             app.setStatus(Application.Status.SAVED); // Rollback to saved status for retry
         }
         
-        return applicationRepository.save(app);
+        Application saved = applicationRepository.save(app);
+        hydrateUrls(saved);
+        return saved;
     }
 
     public Application updateStatus(String applicationId, Application.Status status, String userId) {
