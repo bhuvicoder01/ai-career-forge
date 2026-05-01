@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 interface SyncStatus {
-  status: 'IDLE' | 'SYNCING' | 'COMPLETED' | 'FAILED';
+  status: 'IDLE' | 'SYNCING' | 'MATCHING' | 'COMPLETED' | 'FAILED';
   currentSkill?: string;
   progress?: number;
   total?: number;

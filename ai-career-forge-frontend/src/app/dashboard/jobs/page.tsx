@@ -32,7 +32,7 @@ export default function JobsPage() {
 
   // Read sync status from the global store (managed at layout level)
   const syncStatus = useSyncStore((state) => state.syncStatus);
-  const isSyncing = syncStatus.status === 'SYNCING';
+  const isSyncing = syncStatus.status === 'SYNCING' || syncStatus.status === 'MATCHING';
 
   const fetchRecommended = async () => {
     try {

@@ -20,20 +20,29 @@ public class UserProfile {
     private String id;
 
     private String userId; // Link to User
+    private String fullName;
+    private String headline;
+    private String bio;
+    private String profilePhotoUrl;
 
     private String resumeS3Url;
     private String parsedGoals;
     private String rawResumeText;
     
+    @Builder.Default
     private List<String> skills = new java.util.ArrayList<>();
+    @Builder.Default
     private List<Experience> experiences = new java.util.ArrayList<>();
 
     private String preferredLocation;
     private String preferredSalary;
     private String preferredLifestyle;
 
+    @Builder.Default
     private List<AcademicProject> academicProjects = new java.util.ArrayList<>();
+    @Builder.Default
     private List<Certification> certifications = new java.util.ArrayList<>();
+    @Builder.Default
     private List<Internship> internships = new java.util.ArrayList<>();
 
     @Data
