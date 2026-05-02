@@ -20,15 +20,38 @@ public class UserProfileService {
     private final ProfileAiAgent profileAiAgent;
     private final JobService jobService;
     private final JobSyncService jobSyncService;
+    private final org.springframework.ai.chat.client.ChatClient chatClient;
 
     public UserProfile getProfile(String userId) {
-        return userProfileRepository.findByUserId(userId)
+        UserProfile profile = userProfileRepository.findByUserId(userId)
                 .orElseGet(() -> {
                     UserProfile newProfile = UserProfile.builder()
                             .userId(userId)
                             .build();
                     return userProfileRepository.save(newProfile);
                 });
+        hydrateUrls(profile);
+        return profile;
+    }
+
+    private void hydrateUrls(UserProfile profile) {
+        if (profile == null) return;
+        profile.setResumeS3Url(hydrateUrl(profile.getResumeS3Url()));
+        profile.setProfilePhotoUrl(hydrateUrl(profile.getProfilePhotoUrl()));
+        profile.setCoverImageUrl(hydrateUrl(profile.getCoverImageUrl()));
+    }
+
+    private String hydrateUrl(String url) {
+        if (url == null || url.isBlank()) return null;
+        if (url.startsWith("http")) {
+            // If it's already an absolute URL (like Pollinations), proxy it through our backend
+            // to bypass CORS/Network blocks that the client might have.
+            if (url.contains("pollinations.ai") || url.contains("unsplash.com")) {
+                return s3Service.getProxyUrl(url);
+            }
+            return url;
+        }
+        return s3Service.getPermanentUrl(url);
     }
 
     /**
@@ -63,6 +86,7 @@ public class UserProfileService {
         jobService.purgeJobsForUser(userId);
         userProfileRepository.save(profile);
         jobSyncService.syncJobsForUser(userId);
+        hydrateUrls(profile);
         return profile;
     }
 
@@ -73,31 +97,99 @@ public class UserProfileService {
         byte[] bytes;
         try {
             bytes = file.getBytes();
-            log.debug("Read {} bytes from uploaded photo", bytes.length);
         } catch (IOException e) {
-            log.error("Failed to read photo bytes", e);
             throw new RuntimeException("Failed to read file", e);
         }
         
-        String s3Key;
+        String s3Key = s3Service.uploadFile(bytes, file.getOriginalFilename(), userId, "photos");
+        profile.setProfilePhotoUrl(s3Key);
+        UserProfile saved = userProfileRepository.save(profile);
+        hydrateUrls(saved);
+        return saved;
+    }
+
+    public UserProfile uploadCoverImage(String userId, MultipartFile file) {
+        log.info("Starting cover image upload for user: {}", userId);
+        UserProfile profile = getProfile(userId);
+        byte[] bytes;
         try {
-            s3Key = s3Service.uploadFile(bytes, file.getOriginalFilename(), userId, "photos");
-            log.info("Photo uploaded to S3 with key: {}", s3Key);
+            bytes = file.getBytes();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read file", e);
+        }
+        
+        String s3Key = s3Service.uploadFile(bytes, file.getOriginalFilename(), userId, "covers");
+        profile.setCoverImageUrl(s3Key);
+        UserProfile saved = userProfileRepository.save(profile);
+        hydrateUrls(saved);
+        return saved;
+    }
+
+    public UserProfile setPredefinedCover(String userId, String imageUrl) {
+        log.info("Setting predefined cover for user: {}", userId);
+        UserProfile profile = getProfile(userId);
+        profile.setCoverImageUrl(imageUrl);
+        UserProfile saved = userProfileRepository.save(profile);
+        hydrateUrls(saved);
+        return saved;
+    }
+
+    public UserProfile generateAiCover(String userId, String style) {
+        log.info("Generating AI cover for user: {} with style: {}", userId, style);
+        UserProfile profile = getProfile(userId);
+        
+        // Use AI to generate a prompt based on user's bio/skills
+        String promptRequest = String.format(
+            "Based on this user profile, generate a short 5-10 word professional image prompt for a LinkedIn cover banner. " +
+            "Style: %s. Bio: %s. Skills: %s. " +
+            "IMPORTANT: Return ONLY the prompt text. NO special characters, NO dots, NO commas. ONLY letters and spaces.",
+            style, profile.getBio(), profile.getSkills()
+        );
+        
+        String imagePrompt = chatClient.prompt().user(promptRequest).call().content();
+        // Clean prompt: remove trailing period, newlines and extra spaces
+        if (imagePrompt != null) {
+            imagePrompt = imagePrompt.trim().replaceAll("\\.$", "");
+        }
+        log.debug("AI Image Prompt: {}", imagePrompt);
+        
+        // Using image.pollinations.ai with the turbo model for better speed and stability
+        String encodedPrompt = java.net.URLEncoder.encode(imagePrompt, java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        String aiImageUrl = "https://image.pollinations.ai/prompt/" + encodedPrompt + "?width=1200&height=400&model=turbo&nologo=true&seed=" + System.currentTimeMillis();
+        
+        log.info("Downloading AI image to persist in S3: {}", aiImageUrl);
+        try {
+            // Use a clean Chrome-like User-Agent to avoid blocks during download
+            java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
+                    .followRedirects(java.net.http.HttpClient.Redirect.ALWAYS)
+                    .build();
+            
+            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(aiImageUrl))
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .timeout(java.time.Duration.ofSeconds(60))
+                    .build();
+
+            java.net.http.HttpResponse<byte[]> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+            
+            if (response.statusCode() == 200) {
+                // Upload to S3 under covers/
+                String s3Key = s3Service.uploadFile(response.body(), "ai-cover.jpg", userId, "covers");
+                profile.setCoverImageUrl(s3Key);
+                log.info("AI Cover persisted to S3 with key: {}", s3Key);
+            } else {
+                log.warn("Failed to download AI image (Status: {}). Falling back to URL.", response.statusCode());
+                profile.setCoverImageUrl(aiImageUrl);
+            }
         } catch (Exception e) {
-            log.error("S3 upload failed during photo upload", e);
-            throw e;
+            log.error("Error persisting AI image to S3: {}", e.getMessage());
+            profile.setCoverImageUrl(aiImageUrl); // Fallback to raw URL
         }
 
-        try {
-            String presignedUrl = s3Service.getPresignedUrl(s3Key);
-            profile.setProfilePhotoUrl(presignedUrl);
-            UserProfile saved = userProfileRepository.save(profile);
-            log.info("Profile photo URL saved to database for user: {}", userId);
-            return saved;
-        } catch (Exception e) {
-            log.error("Database update failed after photo upload", e);
-            throw new RuntimeException("Failed to save profile photo URL to database", e);
-        }
+        UserProfile saved = userProfileRepository.save(profile);
+        hydrateUrls(saved);
+        return saved;
     }
 
     public UserProfile uploadResume(String userId, MultipartFile file) {
@@ -111,8 +203,7 @@ public class UserProfileService {
         }
         
         String s3Key = s3Service.uploadFile(bytes, file.getOriginalFilename(), userId);
-        String presignedUrl = s3Service.getPresignedUrl(s3Key);
-        profile.setResumeS3Url(presignedUrl);
+        profile.setResumeS3Url(s3Key); // Store key
         
         // Extract text from the uploaded PDF resume
         String extractedText = extractTextFromPdf(file);
@@ -131,6 +222,7 @@ public class UserProfileService {
         jobService.purgeJobsForUser(userId);
         userProfileRepository.save(profile);
         jobSyncService.syncJobsForUser(userId);
+        hydrateUrls(profile);
         return profile;
     }
 
@@ -153,8 +245,7 @@ public class UserProfileService {
             }
             
             String s3Key = s3Service.uploadFile(bytes, resumeFile.getOriginalFilename(), userId);
-            String presignedUrl = s3Service.getPresignedUrl(s3Key);
-            profile.setResumeS3Url(presignedUrl);
+            profile.setResumeS3Url(s3Key); // Store key
             
             String extractedText = extractTextFromPdf(resumeFile);
             profile.setRawResumeText(extractedText);
@@ -188,7 +279,7 @@ public class UserProfileService {
         // Step 3: Save and trigger multi-source sync
         userProfileRepository.save(profile);
         jobSyncService.syncJobsForUser(userId);
-        
+        hydrateUrls(profile);
         return profile;
     }
 

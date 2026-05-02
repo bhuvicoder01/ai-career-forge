@@ -23,6 +23,9 @@ public class S3Service {
     @Value("${spring.cloud.aws.s3.bucket-name:ai-career-forge-users-data-bucket}")
     private String bucketName;
 
+    @Value("${app.backend-url:http://localhost:8080}")
+    private String backendUrl;
+
     public String uploadFile(byte[] content, String originalFilename, String userId) {
         return uploadFile(content, originalFilename, userId, "resumes");
     }
@@ -32,11 +35,8 @@ public class S3Service {
         String cleanName = originalFilename != null ? originalFilename.replaceAll("[^a-zA-Z0-9.-]", "_") : "unnamed";
         String key = String.format("users/%s/%s/%d-%s", userId, type, System.currentTimeMillis(), cleanName);
         
-        log.info("Uploading {} to S3: {} bucket: {}", type, key, bucketName);
-        
         try {
-            // Using S3Template to upload with potential content type detection
-            // In Spring Cloud AWS 3.x, we can pass a callback or metadata if needed
+            // Using S3Template to upload
             s3Template.upload(bucketName, key, new java.io.ByteArrayInputStream(content));
             return key;
         } catch (Exception e) {
@@ -45,8 +45,37 @@ public class S3Service {
         }
     }
 
+    public byte[] downloadFile(String key) {
+        log.info("Downloading file from S3: {}", key);
+        try {
+            return s3Template.download(bucketName, key).getContentAsByteArray();
+        } catch (Exception e) {
+            log.error("S3 Download Failed for key: {} - Error: {}", key, e.getMessage());
+            throw new RuntimeException("S3 Download Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Returns a permanent URL that redirects to a fresh presigned URL.
+     * This URL never expires as it's anchored to our backend.
+     */
+    public String getPermanentUrl(String key) {
+        if (key == null || key.isBlank()) return null;
+        return backendUrl + "/api/v1/public/assets/" + key;
+    }
+
+    public String getProxyUrl(String externalUrl) {
+        if (externalUrl == null || externalUrl.isBlank()) return null;
+        try {
+            String encodedUrl = java.net.URLEncoder.encode(externalUrl, java.nio.charset.StandardCharsets.UTF_8);
+            return backendUrl + "/api/v1/public/external/proxy?url=" + encodedUrl;
+        } catch (Exception e) {
+            return externalUrl;
+        }
+    }
+
     public String getPresignedUrl(String key) {
-        log.info("Generating presigned URL for key: {}", key);
+        log.info("Generating fresh presigned URL for key: {}", key);
         
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                 .bucket(bucketName)
@@ -54,7 +83,7 @@ public class S3Service {
                 .build();
 
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-                .signatureDuration(Duration.ofHours(1))
+                .signatureDuration(Duration.ofHours(24)) // Increased to 24h
                 .getObjectRequest(getObjectRequest)
                 .build();
 

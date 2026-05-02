@@ -24,6 +24,7 @@ public class UserProfile {
     private String headline;
     private String bio;
     private String profilePhotoUrl;
+    private String coverImageUrl;
 
     private String resumeS3Url;
     private String parsedGoals;
