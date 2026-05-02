@@ -24,4 +24,10 @@ public class AuthController {
     public ResponseEntity<AuthResponse> authenticate(@RequestBody AuthRequest request) {
         return ResponseEntity.ok(authService.authenticate(request));
     }
+
+    @PutMapping("/password")
+    public ResponseEntity<Void> changePassword(@org.springframework.security.core.annotation.AuthenticationPrincipal com.aicareerforge.model.User user, @RequestBody java.util.Map<String, String> request) {
+        authService.changePassword(user.getId(), request.get("oldPassword"), request.get("newPassword"));
+        return ResponseEntity.ok().build();
+    }
 }

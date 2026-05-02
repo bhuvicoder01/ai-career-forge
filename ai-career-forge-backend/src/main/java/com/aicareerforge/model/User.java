@@ -33,6 +33,9 @@ public class User implements UserDetails {
     
     private Role role;
 
+    @Builder.Default
+    private boolean isPasswordGenerated = false;
+
     public enum Role {
         USER, ADMIN
     }

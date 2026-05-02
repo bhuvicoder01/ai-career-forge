@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { 
   User, Mail, Briefcase, MapPin, Camera, Save, Plus, Trash2, X, Eye, EyeOff,
   ChevronRight, BrainCircuit, History, GraduationCap, Code2, Loader2,
-  ExternalLink, Globe, Award, Sparkles, Building2, Calendar
+  ExternalLink, Globe, Award, Sparkles, Building2, Calendar, FileText, UploadCloud, CheckCircle2
 } from "lucide-react";
 import api from "@/lib/api";
 import Image from "next/image";
@@ -38,13 +38,23 @@ interface UserProfile {
   bio: string;
   profilePhotoUrl: string;
   coverImageUrl: string;
+  resumeS3Url: string;
   skills: string[];
   experiences: Experience[];
+  internships: any[];
   academicProjects: AcademicProject[];
   certifications: Certification[];
   preferredLocation: string;
   preferredSalary: string;
   preferredLifestyle: string;
+  settings?: {
+    matchingPrecision: number;
+    aggressiveEnrichment: boolean;
+    emailNotifications: boolean;
+    jobMatchAlerts: boolean;
+    hideProfile: boolean;
+    anonymizeData: boolean;
+  };
 }
 
 interface Area {
@@ -63,9 +73,11 @@ export default function ProfilePage() {
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
   const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
   const [isCoverCropModalOpen, setIsCoverCropModalOpen] = useState(false);
+  const [isResumeSyncModalOpen, setIsResumeSyncModalOpen] = useState(false);
   const [isGeneratingAiCover, setIsGeneratingAiCover] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [coverToCrop, setCoverToCrop] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<UserProfile | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
@@ -290,6 +302,71 @@ export default function ProfilePage() {
     setIsCoverModalOpen(false);
   };
 
+  const handleViewResume = () => {
+    if (!profile?.resumeS3Url) return;
+    // Check if it's already a full URL (hydrated by backend)
+    const url = profile.resumeS3Url.startsWith("http") 
+      ? profile.resumeS3Url 
+      : `${BACKEND_URL}/public/assets/${profile.resumeS3Url}`;
+    window.open(url, "_blank");
+  };
+
+  const resumeInputRef = useRef<HTMLInputElement>(null);
+
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await api.post("/profile/resume", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      
+      // Store suggestions and open the confirmation modal
+      setSuggestions(res.data);
+      setIsResumeSyncModalOpen(true);
+      toast.success("Resume uploaded & analyzed by AI");
+    } catch (err) {
+      toast.error("Failed to analyze resume");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const applySuggestions = async () => {
+    if (!suggestions || !profile) return;
+    
+    // Merge suggestions with current profile
+    const updatedProfile = {
+      ...profile,
+      fullName: suggestions.fullName || profile.fullName,
+      headline: suggestions.headline || profile.headline,
+      bio: suggestions.bio || profile.bio,
+      skills: suggestions.skills && suggestions.skills.length > 0 ? suggestions.skills : profile.skills,
+      experiences: suggestions.experiences && suggestions.experiences.length > 0 ? suggestions.experiences : profile.experiences,
+      internships: suggestions.internships && suggestions.internships.length > 0 ? suggestions.internships : profile.internships,
+      academicProjects: suggestions.academicProjects && suggestions.academicProjects.length > 0 ? suggestions.academicProjects : profile.academicProjects,
+      certifications: suggestions.certifications && suggestions.certifications.length > 0 ? suggestions.certifications : profile.certifications,
+    };
+
+    setSaving(true);
+    try {
+      await api.put("/profile", updatedProfile);
+      setProfile(updatedProfile);
+      toast.success("Profile synced with resume data!");
+      setIsResumeSyncModalOpen(false);
+      setSuggestions(null);
+    } catch (err) {
+      toast.error("Failed to apply suggestions");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const addSkill = (skill: string) => {
     if (!profile || !skill.trim() || profile.skills.includes(skill.trim())) return;
     setProfile({ ...profile, skills: [...profile.skills, skill.trim()] });
@@ -439,11 +516,13 @@ export default function ProfilePage() {
         <div className="space-y-10">
           {/* About Section */}
           <section className="bg-card border border-border rounded-3xl p-8 space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-xl">
-                <Sparkles className="w-5 h-5 text-primary" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-xl">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                </div>
+                <h3 className="text-xl font-black uppercase tracking-tight">About Me</h3>
               </div>
-              <h3 className="text-xl font-black uppercase tracking-tight">About Me</h3>
             </div>
             <textarea
               value={profile.bio || ""}
@@ -451,6 +530,70 @@ export default function ProfilePage() {
               placeholder="Tell your story..."
               className="w-full min-h-[150px] bg-secondary/30 rounded-2xl p-4 border-transparent focus:border-primary/30 focus:ring-0 transition-all resize-none text-sm leading-relaxed"
             />
+          </section>
+
+          {/* Resume Management */}
+          <section className="bg-card border border-border rounded-3xl p-8 space-y-6 relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-500/10 rounded-xl">
+                  <FileText className="w-5 h-5 text-blue-500" />
+                </div>
+                <h3 className="text-xl font-black uppercase tracking-tight">Resume</h3>
+              </div>
+              {uploading && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
+            </div>
+
+            <div className="space-y-4 relative z-10">
+              {profile.resumeS3Url ? (
+                <div className="flex items-center justify-between p-4 bg-secondary/50 rounded-2xl border border-border">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div className="overflow-hidden">
+                      <p className="text-xs font-black truncate">Your Active Resume</p>
+                      <p className="text-[10px] text-muted-foreground font-bold">Uploaded to ZENITH</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={handleViewResume}
+                      className="p-2 hover:bg-blue-500/10 rounded-lg text-blue-500 transition-colors"
+                      title="View Resume"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => resumeInputRef.current?.click()}
+                      className="p-2 hover:bg-primary/10 rounded-lg text-primary transition-colors"
+                      title="Update Resume"
+                    >
+                      <UploadCloud className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => resumeInputRef.current?.click()}
+                  className="w-full py-10 border-2 border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-2 hover:bg-primary/5 hover:border-primary/30 transition-all group/upload"
+                >
+                  <UploadCloud className="w-8 h-8 text-muted-foreground group-hover/upload:text-primary transition-colors" />
+                  <span className="text-xs font-black uppercase text-muted-foreground">Upload PDF Resume</span>
+                </button>
+              )}
+              <input 
+                type="file" 
+                ref={resumeInputRef} 
+                onChange={handleResumeUpload} 
+                accept=".pdf" 
+                className="hidden" 
+              />
+              <p className="text-[10px] text-center text-muted-foreground font-medium">
+                AI will extract skills & experience to sync your profile.
+              </p>
+            </div>
           </section>
 
           {/* Preferences */}
@@ -1009,6 +1152,121 @@ export default function ProfilePage() {
                 className="px-6 py-2 bg-secondary text-secondary-foreground rounded-xl font-bold hover:bg-secondary/80 transition-all"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Sync Confirmation Modal */}
+      {isResumeSyncModalOpen && suggestions && (
+        <div className="fixed inset-0 z-[2500] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="w-full max-w-2xl bg-card border border-border rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-300">
+            <div className="p-8 border-b border-border bg-gradient-to-br from-blue-500/10 via-transparent to-transparent">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-blue-500/20 rounded-2xl border border-blue-500/30">
+                    <Sparkles className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <h3 className="text-2xl font-black uppercase tracking-tight">AI Data Sync</h3>
+                </div>
+                <button 
+                  onClick={() => setIsResumeSyncModalOpen(false)}
+                  className="p-2 hover:bg-secondary rounded-xl transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <p className="text-muted-foreground text-sm font-medium">
+                We&apos;ve analyzed your resume. Would you like to automatically fill your profile with the detected information?
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 space-y-8">
+              {/* Identity & Bio */}
+              <div className="p-6 bg-blue-500/5 rounded-3xl border border-blue-500/20 space-y-4">
+                <div className="flex items-center gap-3">
+                   <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center">
+                      <User className="w-6 h-6 text-blue-500" />
+                   </div>
+                   <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-blue-500/60">Branding Suggestions</p>
+                      <h4 className="font-black text-lg">{suggestions.fullName || "Your Name"}</h4>
+                   </div>
+                </div>
+                {suggestions.headline && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Generated Headline</p>
+                    <p className="text-sm font-bold text-foreground italic">"{suggestions.headline}"</p>
+                  </div>
+                )}
+                {suggestions.bio && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">AI Professional Summary</p>
+                    <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">{suggestions.bio}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Detected Skills */}
+              {suggestions.skills?.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-400">Detected Skills ({suggestions.skills.length})</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestions.skills.map(s => (
+                      <span key={s} className="px-3 py-1.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full text-[10px] font-black uppercase tracking-tight">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Detected Experience */}
+              {suggestions.experiences?.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-violet-400">Professional Experience ({suggestions.experiences.length})</h4>
+                  <div className="space-y-3">
+                    {suggestions.experiences.map((exp, i) => (
+                      <div key={i} className="p-4 bg-secondary/30 rounded-2xl border border-border/50">
+                        <p className="font-black text-sm">{exp.title}</p>
+                        <p className="text-xs text-muted-foreground font-bold">{exp.company} • {exp.duration}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Detected Projects */}
+              {suggestions.academicProjects?.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-400">Key Projects ({suggestions.academicProjects.length})</h4>
+                  <div className="space-y-3">
+                    {suggestions.academicProjects.map((proj, i) => (
+                      <div key={i} className="p-4 bg-secondary/30 rounded-2xl border border-border/50">
+                        <p className="font-black text-sm">{proj.title}</p>
+                        <p className="text-[10px] text-muted-foreground font-medium line-clamp-1">{proj.technologies}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-8 border-t border-border bg-secondary/20 flex flex-col sm:flex-row gap-4">
+              <button 
+                onClick={() => setIsResumeSyncModalOpen(false)}
+                className="flex-1 py-4 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-2xl font-black uppercase tracking-widest text-xs transition-all"
+              >
+                Keep Current Data
+              </button>
+              <button 
+                onClick={applySuggestions}
+                disabled={saving}
+                className="flex-[1.5] py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-3 disabled:opacity-50"
+              >
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                Sync Everything
               </button>
             </div>
           </div>

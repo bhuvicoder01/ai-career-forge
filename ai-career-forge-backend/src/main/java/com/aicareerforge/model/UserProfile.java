@@ -20,6 +20,8 @@ public class UserProfile {
     private String id;
 
     private String userId; // Link to User
+    private String email; // Transient/Stored for UI
+    private boolean isPasswordGenerated; // For security UI
     private String fullName;
     private String headline;
     private String bio;
@@ -45,6 +47,21 @@ public class UserProfile {
     private List<Certification> certifications = new java.util.ArrayList<>();
     @Builder.Default
     private List<Internship> internships = new java.util.ArrayList<>();
+
+    @Builder.Default
+    private UserSettings settings = new UserSettings();
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UserSettings {
+        private int matchingPrecision = 80;
+        private boolean aggressiveEnrichment = true;
+        private boolean emailNotifications = true;
+        private boolean jobMatchAlerts = true;
+        private boolean hideProfile = false;
+        private boolean anonymizeData = false;
+    }
 
     @Data
     @NoArgsConstructor

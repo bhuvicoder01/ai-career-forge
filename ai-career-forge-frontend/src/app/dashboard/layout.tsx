@@ -159,10 +159,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       </div>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-black truncate text-foreground">{profile?.fullName || user?.name || "Career Forge User"}</div>
-                    <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest truncate">{profile?.headline || "Professional"}</div>
-                  </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-black truncate text-foreground">{profile?.fullName || user?.name || "ZENITH User"}</div>
+                      <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest truncate">{profile?.headline || "Professional"}</div>
+                    </div>
                 </Link>
 
                 <div className="flex items-center justify-between px-2">

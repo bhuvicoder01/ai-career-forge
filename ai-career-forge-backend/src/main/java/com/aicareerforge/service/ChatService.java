@@ -16,7 +16,7 @@ public class ChatService {
         log.info("Processing chat message: {}", message);
         
         String prompt = String.format("""
-                SYSTEM: You are the AI CareerForge assistant. You help users refine their resumes, cover letters, and interview prep kits.
+                SYSTEM: You are the ZENITH Intelligence assistant. You help users refine their resumes, cover letters, and interview prep kits.
                 Keep your answers professional, helpful, and concise. 
                 
                 CONTEXT:

@@ -61,13 +61,15 @@ public class UserProfileController {
     public ResponseEntity<Map<String, Object>> completeOnboarding(
             @AuthenticationPrincipal User user,
             @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "headline", required = false) String headline,
+            @RequestParam(value = "bio", required = false) String bio,
             @RequestParam(value = "parsedGoals", required = false) String parsedGoals,
             @RequestParam(value = "preferredLocation", required = false) String preferredLocation,
             @RequestParam(value = "preferredSalary", required = false) String preferredSalary,
             @RequestParam(value = "preferredLifestyle", required = false) String preferredLifestyle) {
 
         UserProfile profile = userProfileService.completeOnboarding(
-                user.getId(), file, parsedGoals, preferredLocation, preferredSalary, preferredLifestyle);
+                user.getId(), file, headline, bio, parsedGoals, preferredLocation, preferredSalary, preferredLifestyle);
 
         return ResponseEntity.ok(Map.of(
                 "profile", profile,
@@ -82,5 +84,11 @@ public class UserProfileController {
     public ResponseEntity<Map<String, Boolean>> getOnboardingStatus(@AuthenticationPrincipal User user) {
         boolean needs = userProfileService.needsOnboarding(user.getId());
         return ResponseEntity.ok(Map.of("needsOnboarding", needs));
+    }
+
+    @DeleteMapping
+    public ResponseEntity<Void> deleteProfile(@AuthenticationPrincipal User user) {
+        userProfileService.deleteProfile(user.getId());
+        return ResponseEntity.noContent().build();
     }
 }

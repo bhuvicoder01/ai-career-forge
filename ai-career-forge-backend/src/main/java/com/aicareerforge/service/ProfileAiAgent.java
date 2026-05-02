@@ -24,15 +24,21 @@ public class ProfileAiAgent {
                 Return ONLY a valid JSON object. Do not include any preamble, conversational text, or explanation.
                 
                 Rules for extraction:
-                1. "skills": Extract all specific technical skills, programming languages, and tools.
-                2. "experiences": Extract all full-time work history.
-                3. "internships": Extract all internship roles separately.
-                4. "academicProjects": Extract significant academic or personal projects with title, tech stack (technologies), and link if available.
-                5. "certifications": Extract all professional certifications with name, issuer, and date.
-                6. "parsedGoals": Generate a professional one-sentence career objective based on the content.
+                1. "fullName": Extract the person's full name from the header.
+                2. "headline": Create a professional one-line headline (e.g., "Senior Software Engineer | Backend Specialist").
+                3. "bio": Generate a professional 2-3 sentence summary (About Me) based on their career achievements.
+                4. "skills": Extract all specific technical skills, programming languages, and tools.
+                5. "experiences": Extract all full-time work history.
+                6. "internships": Extract all internship roles separately.
+                7. "academicProjects": Extract significant academic or personal projects.
+                8. "certifications": Extract all professional certifications.
+                9. "parsedGoals": Generate a one-sentence long-term career objective.
                 
                 Strict JSON structure:
                 {
+                  "fullName": "...",
+                  "headline": "...",
+                  "bio": "...",
                   "skills": ["Skill 1", "Skill 2"],
                   "experiences": [{ "title": "...", "company": "...", "duration": "...", "description": "..." }],
                   "internships": [{ "role": "...", "company": "...", "duration": "...", "description": "..." }],

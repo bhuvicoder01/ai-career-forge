@@ -24,6 +24,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
@@ -39,11 +40,15 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         Optional<User> userOptional = userRepository.findByEmail(email);
         boolean isNewUser = userOptional.isEmpty();
 
+        String tempPass = null;
         User user;
         if (isNewUser) {
+            tempPass = java.util.UUID.randomUUID().toString().substring(0, 10);
             user = User.builder()
                     .email(email)
                     .name(name)
+                    .password(passwordEncoder.encode(tempPass))
+                    .isPasswordGenerated(true)
                     .role(User.Role.USER)
                     .build();
             user = userRepository.save(user);
@@ -54,10 +59,15 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         String token = jwtService.generateToken(user);
         
-        String targetUrl = UriComponentsBuilder.fromUriString(frontendUrl)
+        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUriString(frontendUrl)
                 .path(isNewUser ? "/auth/onboarding" : "/dashboard")
-                .queryParam("token", token)
-                .build().toUriString();
+                .queryParam("token", token);
+        
+        if (tempPass != null) {
+            uriBuilder.queryParam("tempPass", tempPass);
+        }
+
+        String targetUrl = uriBuilder.build().toUriString();
 
         log.info("Redirecting user to: {}", targetUrl);
         getRedirectStrategy().sendRedirect(request, response, targetUrl);

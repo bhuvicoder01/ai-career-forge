@@ -90,4 +90,14 @@ public class S3Service {
         PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
         return presignedRequest.url().toString();
     }
+
+    public void deleteFile(String key) {
+        if (key == null || key.isBlank()) return;
+        try {
+            s3Template.deleteObject(bucketName, key);
+            log.info("Deleted S3 object: {}", key);
+        } catch (Exception e) {
+            log.warn("Failed to delete S3 object: {} - Error: {}", key, e.getMessage());
+        }
+    }
 }

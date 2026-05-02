@@ -1,37 +1,51 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import useAuthStore from "@/store/useAuthStore";
 import api from "@/lib/api";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, needsOnboarding, setNeedsOnboarding } = useAuthStore();
+  const { isAuthenticated, needsOnboarding, setNeedsOnboarding, setToken } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const checkSession = async () => {
-      if (isAuthenticated) {
+    const initializeAuth = async () => {
+      const token = searchParams.get("token");
+      const tempPass = searchParams.get("tempPass");
+
+      if (token) {
+        setToken(token);
+        if (tempPass) {
+          sessionStorage.setItem("zenith_temp_pass", tempPass);
+        }
+      }
+
+      if (token || isAuthenticated) {
         try {
           // Validate session and check onboarding status
-          const [, onboardingRes] = await Promise.all([
-            api.get("/profile"),
-            api.get("/profile/onboarding-status"),
-          ]);
+          const onboardingRes = await api.get("/profile/onboarding-status");
           const { needsOnboarding: needs } = onboardingRes.data;
           setNeedsOnboarding(needs);
         } catch (error) {
-          // 401 is handled by api interceptor
           console.error("Session check failed", error);
         }
       }
+      
       setIsReady(true);
+
+      // Clean the URL if token was present
+      if (token) {
+        const nextUrl = pathname;
+        router.replace(nextUrl);
+      }
     };
 
-    checkSession();
-  }, [isAuthenticated]);
+    initializeAuth();
+  }, [isAuthenticated, searchParams]);
 
   useEffect(() => {
     if (!isReady) return;

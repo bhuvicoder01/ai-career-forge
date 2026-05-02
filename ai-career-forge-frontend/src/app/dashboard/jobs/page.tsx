@@ -24,9 +24,9 @@ interface Job {
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
-  const [searchStatus, setSearchStatus] = useState("");
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
 
@@ -38,12 +38,29 @@ export default function JobsPage() {
     try {
       const response = await api.get("/jobs/recommended");
       setJobs(response.data);
+      setFilteredJobs(response.data);
       return response.data;
     } catch (error) {
       console.error("Failed to fetch recommended jobs:", error);
       return [];
     }
   };
+
+  // Local Filtering Logic
+  useEffect(() => {
+    const filtered = jobs.filter(job => {
+      const matchesQuery = !query || 
+        job.title.toLowerCase().includes(query.toLowerCase()) || 
+        job.company.toLowerCase().includes(query.toLowerCase()) ||
+        job.description.toLowerCase().includes(query.toLowerCase());
+      
+      const matchesLocation = !location || 
+        job.location.toLowerCase().includes(location.toLowerCase());
+
+      return matchesQuery && matchesLocation;
+    });
+    setFilteredJobs(filtered);
+  }, [query, location, jobs]);
 
   // Refresh jobs when sync completes
   useEffect(() => {
@@ -63,36 +80,18 @@ export default function JobsPage() {
     };
   }, [isSyncing]);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSearching(true);
-    setSearchStatus("Syncing real-time jobs...");
-    try {
-      await api.get(`/jobs/search?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}`);
-      await fetchRecommended();
-      setSearchStatus("");
-    } catch (error) {
-      console.error("Manual search failed:", error);
-      setSearchStatus("Manual search failed. Please try again.");
-    } finally {
-      setSearching(false);
-    }
-  };
-
   const handleReset = async () => {
     if (!confirm("This will clear all current jobs and perform a fresh, diversified sync based on your profile. Continue?")) {
         return;
     }
 
     setSearching(true);
-    setSearchStatus("Cleaning up database...");
     try {
         await api.delete("/jobs");
         setJobs([]);
-        setSearchStatus("Jobs cleared. Upload or update your profile to trigger a fresh sync.");
+        setFilteredJobs([]);
     } catch (error) {
         console.error("Reset failed:", error);
-        setSearchStatus("Reset failed. Please try again.");
     } finally {
       setSearching(false);
     }
@@ -126,12 +125,12 @@ export default function JobsPage() {
           </p>
         </div>
 
-        {/* Search Bar */}
-        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+        {/* Filter Bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
           <div className="flex-1 lg:w-64 xl:w-72">
             <input
               type="text"
-              placeholder="Skill or Title (e.g. Java)"
+              placeholder="Filter by Skill or Title"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
@@ -140,7 +139,7 @@ export default function JobsPage() {
           <div className="flex-1 lg:w-48 xl:w-56">
             <input
               type="text"
-              placeholder="Where (e.g. London)"
+              placeholder="Filter by Location"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
@@ -152,35 +151,17 @@ export default function JobsPage() {
               onClick={handleReset}
               disabled={searching || isSyncing}
               className="p-2.5 rounded-xl bg-secondary/50 text-secondary-foreground hover:bg-secondary transition-all border border-border disabled:opacity-50"
-              title="Reset &amp; Re-sync Profile"
+              title="Reset & Re-sync Profile"
             >
               <RotateCcw className={`w-5 h-5 ${(searching || isSyncing) ? 'animate-spin' : ''}`} />
             </button>
-            <button
-              type="submit"
-              disabled={searching || isSyncing}
-              className="flex-1 lg:flex-none px-6 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:bg-primary/90 transition-all disabled:opacity-50 shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
-            >
-              {searching ? (
-                <div className="w-5 h-5 border-2 border-current border-t-transparent animate-spin rounded-full"></div>
-              ) : (
-                <Briefcase className="w-5 h-5" />
-              )}
-              <span className="lg:hidden xl:inline">Fetch Jobs</span>
-            </button>
           </div>
-        </form>
+        </div>
       </div>
 
-      {searchStatus && (
-        <div className="text-sm text-muted-foreground bg-card/50 px-4 py-2 rounded-xl border border-border/50">
-          {searchStatus}
-        </div>
-      )}
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {jobs.length > 0 ? (
-          jobs.map((job) => (
+        {filteredJobs.length > 0 ? (
+          filteredJobs.map((job) => (
             <div key={job.id} className="group relative bg-card border border-border rounded-2xl p-8 hover:shadow-2xl hover:shadow-primary/5 transition-all flex flex-col gap-5">
               {/* Match Score Badge */}
               <div className="absolute top-4 right-4 flex items-center gap-2">

@@ -77,4 +77,16 @@ public class AuthService {
                 .needsOnboarding(onboardingNeeded)
                 .build();
     }
+
+    public void changePassword(String userId, String oldPassword, String newPassword) {
+        var user = repository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new RuntimeException("Invalid current password");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        repository.save(user);
+    }
 }

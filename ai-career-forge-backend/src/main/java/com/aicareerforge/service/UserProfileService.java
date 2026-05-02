@@ -16,6 +16,7 @@ import java.io.IOException;
 public class UserProfileService {
 
     private final UserProfileRepository userProfileRepository;
+    private final com.aicareerforge.repository.UserRepository userRepository;
     private final S3Service s3Service;
     private final ProfileAiAgent profileAiAgent;
     private final JobService jobService;
@@ -30,6 +31,12 @@ public class UserProfileService {
                             .build();
                     return userProfileRepository.save(newProfile);
                 });
+        
+        userRepository.findById(userId).ifPresent(user -> {
+            profile.setEmail(user.getEmail());
+            profile.setPasswordGenerated(user.isPasswordGenerated());
+        });
+
         hydrateUrls(profile);
         return profile;
     }
@@ -81,6 +88,7 @@ public class UserProfileService {
         if (updatedData.getPreferredLocation() != null) profile.setPreferredLocation(updatedData.getPreferredLocation());
         if (updatedData.getPreferredSalary() != null) profile.setPreferredSalary(updatedData.getPreferredSalary());
         if (updatedData.getPreferredLifestyle() != null) profile.setPreferredLifestyle(updatedData.getPreferredLifestyle());
+        if (updatedData.getSettings() != null) profile.setSettings(updatedData.getSettings());
         
         // Only purge THIS user's jobs, not all jobs
         jobService.purgeJobsForUser(userId);
@@ -203,25 +211,33 @@ public class UserProfileService {
         }
         
         String s3Key = s3Service.uploadFile(bytes, file.getOriginalFilename(), userId);
-        profile.setResumeS3Url(s3Key); // Store key
+        profile.setResumeS3Url(s3Key);
         
         // Extract text from the uploaded PDF resume
         String extractedText = extractTextFromPdf(file);
         profile.setRawResumeText(extractedText);
         
-        // Use AI to extract structured info from the real text
-        UserProfile extractedInfo = profileAiAgent.extractProfileFromResume(extractedText);
-        profile.setSkills(extractedInfo.getSkills());
-        profile.setExperiences(extractedInfo.getExperiences());
-        profile.setInternships(extractedInfo.getInternships());
-        profile.setAcademicProjects(extractedInfo.getAcademicProjects());
-        profile.setCertifications(extractedInfo.getCertifications());
-        profile.setParsedGoals(extractedInfo.getParsedGoals());
-        
-        // Only purge THIS user's jobs, not all jobs
-        jobService.purgeJobsForUser(userId);
+        // Save the profile first with the new resume link and text
         userProfileRepository.save(profile);
+        
+        // Use AI to generate a suggestion, but do NOT save it to the DB yet
+        // The frontend will receive this populated profile and ask for approval
+        UserProfile suggestions = profileAiAgent.extractProfileFromResume(extractedText);
+        
+        // Copy suggestions into the transient profile object we return to the frontend
+        profile.setFullName(suggestions.getFullName());
+        profile.setHeadline(suggestions.getHeadline());
+        profile.setBio(suggestions.getBio());
+        profile.setSkills(suggestions.getSkills());
+        profile.setExperiences(suggestions.getExperiences());
+        profile.setInternships(suggestions.getInternships());
+        profile.setAcademicProjects(suggestions.getAcademicProjects());
+        profile.setCertifications(suggestions.getCertifications());
+        
+        // Also trigger an initial sync in the background so job matching works with the raw text
+        jobService.purgeJobsForUser(userId);
         jobSyncService.syncJobsForUser(userId);
+        
         hydrateUrls(profile);
         return profile;
     }
@@ -231,6 +247,7 @@ public class UserProfileService {
      * Called from onboarding endpoint after user completes all steps.
      */
     public UserProfile completeOnboarding(String userId, MultipartFile resumeFile,
+                                           String headline, String bio,
                                            String parsedGoals, String preferredLocation,
                                            String preferredSalary, String preferredLifestyle) {
         UserProfile profile = getProfile(userId);
@@ -256,13 +273,29 @@ public class UserProfileService {
             profile.setInternships(extractedInfo.getInternships());
             profile.setAcademicProjects(extractedInfo.getAcademicProjects());
             profile.setCertifications(extractedInfo.getCertifications());
-            // Use AI-extracted goals if user didn't provide their own
+
+            // Use AI-extracted identity if user didn't provide their own
+            if ((profile.getFullName() == null || profile.getFullName().isBlank()) && extractedInfo.getFullName() != null) {
+                profile.setFullName(extractedInfo.getFullName());
+            }
+            if ((headline == null || headline.isBlank()) && extractedInfo.getHeadline() != null) {
+                profile.setHeadline(extractedInfo.getHeadline());
+            }
+            if ((bio == null || bio.isBlank()) && extractedInfo.getBio() != null) {
+                profile.setBio(extractedInfo.getBio());
+            }
             if ((parsedGoals == null || parsedGoals.isBlank()) && extractedInfo.getParsedGoals() != null) {
                 profile.setParsedGoals(extractedInfo.getParsedGoals());
             }
         }
         
-        // Step 2: Set preferences
+        // Step 2: Set preferences and manual info
+        if (headline != null && !headline.isBlank()) {
+            profile.setHeadline(headline);
+        }
+        if (bio != null && !bio.isBlank()) {
+            profile.setBio(bio);
+        }
         if (parsedGoals != null && !parsedGoals.isBlank()) {
             profile.setParsedGoals(parsedGoals);
         }
@@ -281,6 +314,25 @@ public class UserProfileService {
         jobSyncService.syncJobsForUser(userId);
         hydrateUrls(profile);
         return profile;
+    }
+
+    public void deleteProfile(String userId) {
+        log.info("Deleting entire career profile for user: {}", userId);
+        userProfileRepository.findByUserId(userId).ifPresent(profile -> {
+            // Delete S3 assets
+            if (profile.getResumeS3Url() != null) s3Service.deleteFile(profile.getResumeS3Url());
+            if (profile.getProfilePhotoUrl() != null) s3Service.deleteFile(profile.getProfilePhotoUrl());
+            if (profile.getCoverImageUrl() != null && !profile.getCoverImageUrl().startsWith("http")) {
+                s3Service.deleteFile(profile.getCoverImageUrl());
+            }
+            
+            // Purge jobs
+            jobService.purgeJobsForUser(userId);
+            
+            // Delete from DB
+            userProfileRepository.delete(profile);
+            log.info("Profile deleted for user: {}", userId);
+        });
     }
 
     private String extractTextFromPdf(MultipartFile file) {
