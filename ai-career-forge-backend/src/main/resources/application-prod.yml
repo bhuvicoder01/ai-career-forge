@@ -84,6 +84,7 @@ rapidapi:
 
 app:
   frontend-url: ${FRONTEND_URL:https://ai-career-forge-sable.vercel.app}
+  backend-url: ${BACKEND_URL:https://ai-career-forge-47ob.onrender.com}
 
 logo:
   dev: 

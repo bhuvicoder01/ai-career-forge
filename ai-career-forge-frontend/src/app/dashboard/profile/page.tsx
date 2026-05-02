@@ -72,6 +72,8 @@ export default function ProfilePage() {
   const [canRenderCropper, setCanRenderCropper] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+  
 
   useEffect(() => {
     if (isCropModalOpen || isCoverCropModalOpen) {
@@ -102,7 +104,7 @@ export default function ProfilePage() {
   const hydrateUrl = (url: string) => {
     if (!url || !url.startsWith("http")) return url;
     if (url.includes("pollinations.ai") || url.includes("image.pollinations.ai") || url.includes("unsplash.com")) {
-      return `http://localhost:8080/api/v1/public/external/proxy?url=${encodeURIComponent(url)}`;
+      return `${BACKEND_URL}/public/external/proxy?url=${encodeURIComponent(url)}`;
     }
     return url;
   };
