@@ -10,6 +10,11 @@ const nextConfig = {
         pathname: '/**',
       },
       {
+        protocol:'https',
+        hostname:'ai-career-forge-47ob.onrender.com',
+        pathname:'/**'
+      },
+      {
         protocol: 'https',
         hostname: 'ai-career-forge-users-data-bucket.s3.amazonaws.com',
         port: '',
