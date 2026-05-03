@@ -10,7 +10,7 @@ import Image from "next/image";
 import useAuthStore from "@/store/useAuthStore";
 
 import AuthGuard from "@/components/AuthGuard";
-import FloatingAiAssistant from "@/components/FloatingAiAssistant";
+
 import useSyncStore from "@/store/useSyncStore";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
@@ -297,7 +297,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
-      <FloatingAiAssistant />
+
     </>
   );
 }

@@ -6,6 +6,7 @@ import AuthGuard from '@/components/AuthGuard'
 
 import { ThemeProvider } from '@/components/ThemeProvider'
 import ThemeToggle from '@/components/ThemeToggle'
+import AssistantWidget from '@/components/AssistantWidget'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -32,6 +33,7 @@ export default function RootLayout({
             <AuthGuard>
               {children}
               <ThemeToggle />
+              <AssistantWidget />
             </AuthGuard>
           </Suspense>
         </ThemeProvider>

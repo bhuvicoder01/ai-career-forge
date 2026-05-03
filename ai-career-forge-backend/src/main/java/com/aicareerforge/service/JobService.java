@@ -54,6 +54,10 @@ public class JobService {
         return jobRepository.findAll(PageRequest.of(page, size));
     }
 
+    public List<Job> getRecentJobs() {
+        return jobRepository.findTop50ByUserIdIsNullOrderByPostedDateDesc();
+    }
+
     /**
      * Fetch jobs from Adzuna and save them scoped to a specific user.
      */

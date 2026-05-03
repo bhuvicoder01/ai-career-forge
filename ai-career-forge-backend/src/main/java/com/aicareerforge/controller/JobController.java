@@ -29,6 +29,11 @@ public class JobController {
     private final JobSyncService jobSyncService;
     private final SyncSseEmitterRegistry sseRegistry;
 
+    @GetMapping("/public")
+    public ResponseEntity<List<Job>> getPublicJobs() {
+        return ResponseEntity.ok(jobService.getRecentJobs());
+    }
+
     @GetMapping
     public ResponseEntity<Page<Job>> getJobs(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(jobService.getJobs(page, size));
