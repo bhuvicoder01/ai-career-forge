@@ -54,6 +54,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     const isAuthRoute = pathname.startsWith("/auth");
     const isOnboardingRoute = pathname === "/auth/onboarding";
+    const isRoleSelectionRoute = pathname === "/auth/role-selection";
     const isUserDashboard = pathname.startsWith("/dashboard");
     const isRecruiterDashboard = pathname.startsWith("/recruiter");
     const isAdminDashboard = pathname.startsWith("/admin");
@@ -66,7 +67,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     if (isAuthenticated) {
       // Role-based access control
-      if (user?.role === "RECRUITER") {
+      if (user?.role === "PENDING") {
+        if (!isRoleSelectionRoute) {
+          router.replace("/auth/role-selection");
+        }
+      } else if (user?.role === "RECRUITER") {
         if (!isRecruiterDashboard) {
           router.replace("/recruiter/dashboard");
         }
@@ -78,11 +83,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         // Standard USER
         if (isRecruiterDashboard || isAdminDashboard) {
            router.replace("/dashboard");
+        } else if (isRoleSelectionRoute) {
+           router.replace("/dashboard");
         } else if (needsOnboarding && !isOnboardingRoute) {
            router.replace("/auth/onboarding");
         } else if (!needsOnboarding && isOnboardingRoute) {
            router.replace("/dashboard");
-        } else if (isAuthRoute && !isOnboardingRoute) {
+        } else if (isAuthRoute && !isOnboardingRoute && !isRoleSelectionRoute) {
            router.replace("/dashboard");
         }
       }

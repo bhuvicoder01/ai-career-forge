@@ -37,7 +37,7 @@ public class User implements UserDetails {
     private boolean isPasswordGenerated = false;
 
     public enum Role {
-        USER, RECRUITER, ADMIN
+        USER, RECRUITER, ADMIN, PENDING
     }
 
     @Override

@@ -49,7 +49,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                     .name(name)
                     .password(passwordEncoder.encode(tempPass))
                     .isPasswordGenerated(true)
-                    .role(User.Role.USER)
+                    .role(User.Role.PENDING)
                     .build();
             user = userRepository.save(user);
             log.info("Created new user from OAuth2: {}", email);
@@ -61,11 +61,14 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         
         // Determine the correct redirect path based on role and onboarding status
         String redirectPath = "/dashboard";
-        if (user.getRole() == User.Role.ADMIN) {
+        if (user.getRole() == User.Role.PENDING) {
+            redirectPath = "/auth/role-selection";
+        } else if (user.getRole() == User.Role.ADMIN) {
             redirectPath = "/admin/dashboard";
         } else if (user.getRole() == User.Role.RECRUITER) {
             redirectPath = "/recruiter/dashboard";
         } else if (isNewUser) {
+            // This case is now handled by PENDING, but kept as fallback
             redirectPath = "/auth/onboarding";
         }
         

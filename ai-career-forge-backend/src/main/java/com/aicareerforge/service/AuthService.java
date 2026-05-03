@@ -101,4 +101,25 @@ public class AuthService {
                 .needsOnboarding(onboardingNeeded)
                 .build();
     }
+    public AuthResponse updateRole(String userId, String roleStr) {
+        var user = repository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (user.getRole() != User.Role.PENDING) {
+            throw new RuntimeException("Role already selected");
+        }
+
+        try {
+            User.Role role = User.Role.valueOf(roleStr.toUpperCase());
+            if (role != User.Role.USER && role != User.Role.RECRUITER) {
+                throw new RuntimeException("Invalid role selection");
+            }
+            user.setRole(role);
+            repository.save(user);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Invalid role format");
+        }
+
+        return getCurrentUser(user);
+    }
 }
