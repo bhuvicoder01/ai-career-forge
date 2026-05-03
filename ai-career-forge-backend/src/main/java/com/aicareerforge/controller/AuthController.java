@@ -30,4 +30,8 @@ public class AuthController {
         authService.changePassword(user.getId(), request.get("oldPassword"), request.get("newPassword"));
         return ResponseEntity.ok().build();
     }
+    @GetMapping("/me")
+    public ResponseEntity<AuthResponse> getCurrentUser(@org.springframework.security.core.annotation.AuthenticationPrincipal com.aicareerforge.model.User user) {
+        return ResponseEntity.ok(authService.getCurrentUser(user));
+    }
 }

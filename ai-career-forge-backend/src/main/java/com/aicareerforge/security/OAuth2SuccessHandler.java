@@ -59,8 +59,18 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         String token = jwtService.generateToken(user);
         
+        // Determine the correct redirect path based on role and onboarding status
+        String redirectPath = "/dashboard";
+        if (user.getRole() == User.Role.ADMIN) {
+            redirectPath = "/admin/dashboard";
+        } else if (user.getRole() == User.Role.RECRUITER) {
+            redirectPath = "/recruiter/dashboard";
+        } else if (isNewUser) {
+            redirectPath = "/auth/onboarding";
+        }
+        
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUriString(frontendUrl)
-                .path(isNewUser ? "/auth/onboarding" : "/dashboard")
+                .path(redirectPath)
                 .queryParam("token", token);
         
         if (tempPass != null) {

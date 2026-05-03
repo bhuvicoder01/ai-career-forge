@@ -66,6 +66,12 @@ public class UserProfileService {
      * A user needs onboarding if they have no resume and no skills extracted.
      */
     public boolean needsOnboarding(String userId) {
+        // First check the user's role. Admins and Recruiters don't need candidate onboarding.
+        com.aicareerforge.model.User user = userRepository.findById(userId).orElse(null);
+        if (user != null && user.getRole() != com.aicareerforge.model.User.Role.USER) {
+            return false;
+        }
+
         UserProfile profile = userProfileRepository.findByUserId(userId).orElse(null);
         if (profile == null) return true;
         boolean hasResume = profile.getResumeS3Url() != null && !profile.getResumeS3Url().isBlank();

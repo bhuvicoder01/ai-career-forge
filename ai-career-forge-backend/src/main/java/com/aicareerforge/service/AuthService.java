@@ -91,4 +91,14 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(newPassword));
         repository.save(user);
     }
+    public AuthResponse getCurrentUser(User user) {
+        boolean onboardingNeeded = userProfileService.needsOnboarding(user.getId());
+        return AuthResponse.builder()
+                .userId(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .needsOnboarding(onboardingNeeded)
+                .build();
+    }
 }

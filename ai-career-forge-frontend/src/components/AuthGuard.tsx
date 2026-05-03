@@ -6,7 +6,7 @@ import useAuthStore from "@/store/useAuthStore";
 import api from "@/lib/api";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated, needsOnboarding, setNeedsOnboarding, setToken } = useAuthStore();
+  const { user, isAuthenticated, needsOnboarding, setNeedsOnboarding, setToken, setAuth } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -26,9 +26,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
       if (token || isAuthenticated) {
         try {
-          // Validate session and check onboarding status
-          const onboardingRes = await api.get("/profile/onboarding-status");
-          const { needsOnboarding: needs } = onboardingRes.data;
+          // Validate session and fetch full user info
+          const userRes = await api.get("/auth/me");
+          const { userId, name, email, role, needsOnboarding: needs } = userRes.data;
+          
+          setAuth({ id: userId, name, email, role }, token || isAuthenticated ? (token || useAuthStore.getState().token!) : "", needs);
           setNeedsOnboarding(needs);
         } catch (error) {
           console.error("Session check failed", error);
