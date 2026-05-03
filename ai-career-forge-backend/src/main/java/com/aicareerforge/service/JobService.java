@@ -2,8 +2,10 @@ package com.aicareerforge.service;
 
 import com.aicareerforge.dto.RemotiveJobResponse;
 import com.aicareerforge.model.Job;
+import com.aicareerforge.model.UserJobMatch;
 import com.aicareerforge.model.UserProfile;
 import com.aicareerforge.repository.JobRepository;
+import com.aicareerforge.repository.UserJobMatchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -31,6 +33,7 @@ import java.util.Map;
 public class JobService {
 
     private final JobRepository jobRepository;
+    private final UserJobMatchRepository userJobMatchRepository;
     private final JobRecommendationAgent recommendationAgent;
     private final AdzunaClient adzunaClient;
     private final RemotiveClient remotiveClient;
@@ -38,8 +41,14 @@ public class JobService {
     private final CompanyIntelligenceService companyIntelligenceService;
     private final java.util.concurrent.Semaphore enrichmentSemaphore = new java.util.concurrent.Semaphore(2);
     
+    @lombok.Setter(onMethod_ = {@org.springframework.beans.factory.annotation.Autowired, @org.springframework.context.annotation.Lazy})
+    private JobService self;
+
     // User ID -> (Job ID -> Score)
     private final Map<String, Map<String, Double>> scoreCache = new ConcurrentHashMap<>();
+    
+    // Set of "userId:jobId" strings currently undergoing background enrichment
+    private final java.util.Set<String> processingExplanations = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     public Page<Job> getJobs(int page, int size) {
         return jobRepository.findAll(PageRequest.of(page, size));
@@ -289,12 +298,12 @@ public class JobService {
      * Trigger the first universal sync immediately when the server starts.
      * This ensures the "Jobs Pool" is populated even if the scheduled cron hasn't fired yet.
      */
-    @EventListener(ApplicationReadyEvent.class)
-    @Async("taskExecutor")
-    public void onApplicationReady() {
-        log.info("Application is ready. Triggering initial universal job sync...");
-        scheduledJobSync();
-    }
+    // @EventListener(ApplicationReadyEvent.class)
+    // @Async("taskExecutor")
+    // public void onApplicationReady() {
+    //     log.info("Application is ready. Triggering initial universal job sync...");
+    //     scheduledJobSync();
+    // }
 
     public List<Job> getRecommendedJobs(UserProfile profile) {
         String userProfileData = profile.getRawResumeText();
@@ -353,18 +362,17 @@ public class JobService {
                         Double finalScore = calculateMatchScore(job, profile, vectorSimilarity);
                         job.setMatchScore(finalScore);
                         
+                        // Load user-specific match data (Explanation, Score, etc.)
+                        UserJobMatch match = userJobMatchRepository.findByUserIdAndJobId(profile.getUserId(), job.getId()).orElse(null);
+                        if (match != null) {
+                            job.setRelevanceExplanation(match.getRelevanceExplanation());
+                            // Override with persisted score if available
+                            if (match.getMatchScore() != null) job.setMatchScore(match.getMatchScore());
+                        }
+
                         if (profile.getUserId() != null) {
                             scoreCache.computeIfAbsent(profile.getUserId(), k -> new ConcurrentHashMap<>())
-                                      .put(job.getId(), finalScore);
-                        }
-                        
-                        if (job.getRelevanceExplanation() == null || job.getRelevanceExplanation().isBlank()) {
-                            try {
-                                job.setRelevanceExplanation(recommendationAgent.generateRelevanceExplanation(job, userProfileData));
-                                jobRepository.save(job);
-                            } catch (Exception e) {
-                                job.setRelevanceExplanation("Strong alignment with your current skill set and career trajectory.");
-                            }
+                                      .put(job.getId(), job.getMatchScore());
                         }
                     }
                     return job;
@@ -372,7 +380,77 @@ public class JobService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
         
-        return deduplicateJobs(allMatchedJobs);
+        List<Job> finalJobs = deduplicateJobs(allMatchedJobs);
+
+        // --- Optimization: Trigger AI background enrichment and return instantly ---
+        String userId = profile.getUserId();
+        List<Job> jobsToEnrich = finalJobs.stream()
+            .filter(j -> {
+                boolean needsEnrichment = j.getRelevanceExplanation() == null || 
+                                         j.getRelevanceExplanation().isBlank() || 
+                                         j.getRelevanceExplanation().contains("background");
+                String key = userId + ":" + j.getId();
+                return needsEnrichment && !processingExplanations.contains(key);
+            })
+            .limit(15) 
+            .collect(Collectors.toList());
+            
+        if (!jobsToEnrich.isEmpty()) {
+            // Mark as processing
+            jobsToEnrich.forEach(j -> processingExplanations.add(userId + ":" + j.getId()));
+            self.enrichJobRelevanceAsync(jobsToEnrich, userProfileData, userId);
+        }
+
+        // Set placeholders for those being enriched
+        for (Job job : finalJobs) {
+            if (job.getRelevanceExplanation() == null || job.getRelevanceExplanation().isBlank()) {
+                job.setRelevanceExplanation("Analyzing profile alignment in the background...");
+            }
+        }
+
+        return finalJobs;
+    }
+
+    /**
+     * Returns all jobs applicable to the user (user-specific + global pool)
+     * with calculated match scores. Sorted by score descending.
+     */
+    public List<Job> getJobCatalog(UserProfile profile) {
+        String userId = profile.getUserId();
+        log.info("Fetching complete job catalog for user: {}", userId);
+        
+        List<Job> allJobs = new ArrayList<>();
+        
+        // 1. Fetch user-specific jobs
+        if (userId != null) {
+            allJobs.addAll(jobRepository.findByUserId(userId));
+        }
+        
+        // 2. Fetch global pool jobs (userId is null)
+        // We limit to a reasonable number to avoid huge payloads, but larger than recommended list
+        allJobs.addAll(jobRepository.findTop50ByUserIdIsNullOrderByPostedDateDesc());
+        
+        // 3. Score and load user-specific data
+        for (Job job : allJobs) {
+            Double cachedScore = getCachedScore(userId, job.getId());
+            
+            UserJobMatch match = userJobMatchRepository.findByUserIdAndJobId(userId, job.getId()).orElse(null);
+            if (match != null) {
+                job.setRelevanceExplanation(match.getRelevanceExplanation());
+                job.setMatchScore(match.getMatchScore() != null ? match.getMatchScore() : cachedScore);
+            }
+            
+            if (job.getMatchScore() == null) {
+                Double calculatedScore = calculateMatchScore(job, profile, 0.5); 
+                job.setMatchScore(calculatedScore);
+                if (userId != null) {
+                    scoreCache.computeIfAbsent(userId, k -> new ConcurrentHashMap<>())
+                              .put(job.getId(), calculatedScore);
+                }
+            }
+        }
+        
+        return deduplicateJobs(allJobs);
     }
 
     /**
@@ -686,5 +764,39 @@ public class JobService {
                    .replaceAll("&nbsp;", " ")
                    .replaceAll("\\s+", " ")
                    .trim();
+    }
+    /**
+     * Asynchronously generates relevance explanations for a batch of jobs.
+     * This allows the UI to return immediately while the AI works in the background.
+     */
+    @Async("taskExecutor")
+    public void enrichJobRelevanceAsync(List<Job> jobs, String userProfileData, String userId) {
+        log.info("Starting background relevance enrichment for {} jobs and user {}", jobs.size(), userId);
+        try {
+            for (Job job : jobs) {
+                String key = userId + ":" + job.getId();
+                try {
+                    Thread.sleep(1000); 
+                    
+                    UserJobMatch match = userJobMatchRepository.findByUserIdAndJobId(userId, job.getId())
+                            .orElse(UserJobMatch.builder().userId(userId).jobId(job.getId()).build());
+
+                    if (match.getRelevanceExplanation() == null || match.getRelevanceExplanation().isBlank()) {
+                        String explanation = recommendationAgent.generateRelevanceExplanation(job, userProfileData);
+                        match.setRelevanceExplanation(explanation);
+                        match.setMatchScore(job.getMatchScore());
+                        userJobMatchRepository.save(match);
+                        
+                        log.debug("Background explanation saved to UserJobMatch for job: {}", job.getId());
+                    }
+                } catch (Exception e) {
+                    log.error("Failed background explanation for job {}: {}", job.getId(), e.getMessage());
+                } finally {
+                    processingExplanations.remove(key);
+                }
+            }
+        } finally {
+            jobs.forEach(j -> processingExplanations.remove(userId + ":" + j.getId()));
+        }
     }
 }

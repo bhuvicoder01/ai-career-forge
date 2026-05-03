@@ -16,6 +16,7 @@ public interface JobRepository extends MongoRepository<Job, String> {
     Optional<Job> findBySourceJobIdAndUserId(String sourceJobId, String userId);
     Optional<Job> findBySourceJobIdAndUserIdIsNull(String sourceJobId);
     List<Job> findByUserId(String userId);
+    List<Job> findByPostedBy(String postedBy);
     @org.springframework.data.mongodb.repository.Query("{ 'userId': null, '$or': [ { 'title': { '$regex': ?0, '$options': 'i' } }, { 'description': { '$regex': ?0, '$options': 'i' } } ] }")
     List<Job> findFallbackJobs(String skill);
 

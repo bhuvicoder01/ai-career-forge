@@ -45,6 +45,16 @@ public class JobController {
         }
     }
 
+    @GetMapping("/catalog")
+    public ResponseEntity<List<Job>> getJobCatalog(@AuthenticationPrincipal User user) {
+        try {
+            UserProfile profile = userProfileService.getProfile(user.getId());
+            return ResponseEntity.ok(jobService.getJobCatalog(profile));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).build();
+        }
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<JobDetailResponse> getJob(@PathVariable String id, @AuthenticationPrincipal User user) {
         Job job = jobService.getJobById(id);

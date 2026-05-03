@@ -6,7 +6,7 @@ import useAuthStore from "@/store/useAuthStore";
 import api from "@/lib/api";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, needsOnboarding, setNeedsOnboarding, setToken } = useAuthStore();
+  const { user, isAuthenticated, needsOnboarding, setNeedsOnboarding, setToken } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -52,23 +52,37 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     const isAuthRoute = pathname.startsWith("/auth");
     const isOnboardingRoute = pathname === "/auth/onboarding";
-    const isDashboardRoute = pathname.startsWith("/dashboard");
+    const isUserDashboard = pathname.startsWith("/dashboard");
+    const isRecruiterDashboard = pathname.startsWith("/recruiter");
+    const isAdminDashboard = pathname.startsWith("/admin");
 
-    if (isDashboardRoute && !isAuthenticated) {
+    if ((isUserDashboard || isRecruiterDashboard || isAdminDashboard) && !isAuthenticated) {
       // Not logged in → send to login
       router.replace("/auth/login");
-    } else if (isDashboardRoute && isAuthenticated && needsOnboarding) {
-      // Logged in but needs onboarding → send to onboarding
-      router.replace("/auth/onboarding");
-    } else if (isOnboardingRoute && isAuthenticated && !needsOnboarding) {
-      // Already completed onboarding → send to dashboard
-      router.replace("/dashboard");
-    } else if (isAuthRoute && !isOnboardingRoute && isAuthenticated) {
-      // On login/register page but already authenticated
-      if (needsOnboarding) {
-        router.replace("/auth/onboarding");
+      return;
+    }
+
+    if (isAuthenticated) {
+      // Role-based access control
+      if (user?.role === "RECRUITER") {
+        if (!isRecruiterDashboard) {
+          router.replace("/recruiter/dashboard");
+        }
+      } else if (user?.role === "ADMIN") {
+        if (!isAdminDashboard) {
+          router.replace("/admin/dashboard");
+        }
       } else {
-        router.replace("/dashboard");
+        // Standard USER
+        if (isRecruiterDashboard || isAdminDashboard) {
+           router.replace("/dashboard");
+        } else if (needsOnboarding && !isOnboardingRoute) {
+           router.replace("/auth/onboarding");
+        } else if (!needsOnboarding && isOnboardingRoute) {
+           router.replace("/dashboard");
+        } else if (isAuthRoute && !isOnboardingRoute) {
+           router.replace("/dashboard");
+        }
       }
     }
   }, [isAuthenticated, needsOnboarding, pathname, router, isReady]);

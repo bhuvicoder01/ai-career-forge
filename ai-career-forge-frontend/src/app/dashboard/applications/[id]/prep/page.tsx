@@ -65,6 +65,10 @@ export default function ApplicationMaterialsPage({ params }: { params: Promise<{
     }
   };
 
+  const isValidS3Url = (url?: string) => {
+    return url && url.includes("/api/v1/public/assets/") && url.length > 25;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -152,15 +156,23 @@ export default function ApplicationMaterialsPage({ params }: { params: Promise<{
                  {isComparing && (
                     <div className="space-y-3">
                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] text-center italic">Baseline Record</p>
-                       <div className="aspect-[1/1.414] w-full bg-muted rounded-2xl border border-border overflow-hidden ring-1 ring-border">
-                          <iframe src={profile?.resumeS3Url} className="w-full h-full border-none opacity-40 grayscale" />
+                       <div className="aspect-[1/1.414] w-full bg-muted rounded-2xl border border-border overflow-hidden ring-1 ring-border relative flex items-center justify-center">
+                          {isValidS3Url(profile?.resumeS3Url) ? (
+                             <iframe src={profile?.resumeS3Url} className="w-full h-full border-none opacity-40 grayscale" />
+                          ) : (
+                             <div className="text-muted-foreground font-black uppercase tracking-widest text-[8px] md:text-xs opacity-50 text-center px-4">No baseline resume found in your profile</div>
+                          )}
                        </div>
                     </div>
                  )}
                  <div className="space-y-3">
                     <p className="text-[10px] font-black text-foreground uppercase tracking-[0.2em] text-center">{isComparing ? 'Optimized Intelligence' : ''}</p>
-                    <div className="aspect-[1/1.414] w-full bg-white rounded-2xl border border-border overflow-hidden shadow-2xl relative">
-                       <iframe src={app.tailoredResumeS3Url} className="w-full h-full border-none" />
+                    <div className="aspect-[1/1.414] w-full bg-white rounded-2xl border border-border overflow-hidden shadow-2xl relative flex items-center justify-center">
+                       {isValidS3Url(app.tailoredResumeS3Url) ? (
+                          <iframe src={app.tailoredResumeS3Url} className="w-full h-full border-none" />
+                       ) : (
+                          <div className="text-muted-foreground font-black uppercase tracking-widest text-[8px] md:text-xs opacity-50 text-center px-4">Intelligence generation in progress...</div>
+                       )}
                     </div>
                  </div>
               </div>

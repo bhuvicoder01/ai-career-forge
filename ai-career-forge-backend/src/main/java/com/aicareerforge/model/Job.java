@@ -20,6 +20,7 @@ public class Job {
     private String id;
     
     private String userId; // Link to the user whose profile triggered the fetch
+    private String postedBy; // Link to the recruiter who created this job manually
     
     private String source; // e.g., "adzuna", "remotive", "local"
     private String sourceJobId;

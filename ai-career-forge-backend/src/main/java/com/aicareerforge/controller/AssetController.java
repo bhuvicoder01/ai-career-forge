@@ -111,8 +111,10 @@ public class AssetController {
             
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
-                    .header("Cache-Control", "public, max-age=86400")
+                    .header("Cache-Control", "no-store, no-cache, must-revalidate")
                     .header("X-Content-Type-Options", "nosniff")
+                    .header("X-Frame-Options", "ALLOWALL")
+                    .header("X-ZENITH-ASSET", "TRUE")
                     .body(content);
         } catch (Exception e) {
             log.error("Failed to serve asset for key: {}", key, e);

@@ -34,7 +34,7 @@ public class AuthService {
                 .name(request.getName())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role(User.Role.USER)
+                .role(request.getRole() != null ? request.getRole() : User.Role.USER)
                 .build();
         repository.save(user);
 
@@ -51,7 +51,8 @@ public class AuthService {
                 .userId(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
-                .needsOnboarding(true) // New user always needs onboarding
+                .role(user.getRole())
+                .needsOnboarding(user.getRole() == User.Role.USER) // Only standard users need onboarding for now
                 .build();
     }
 
@@ -74,6 +75,7 @@ public class AuthService {
                 .userId(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
+                .role(user.getRole())
                 .needsOnboarding(onboardingNeeded)
                 .build();
     }

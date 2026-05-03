@@ -50,7 +50,7 @@ public class JobRecommendationAgent {
     }
 
     public List<Document> searchSimilarJobs(String userProfileText) {
-        log.info("Searching for similar jobs in vector store with optimized threshold (0.01)...");
+        log.info("Searching for similar jobs in vector store (threshold: 0.0)...");
         if (userProfileText == null || userProfileText.isBlank()) {
             log.warn("Search text is empty.");
             return List.of();
