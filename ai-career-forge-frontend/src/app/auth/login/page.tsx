@@ -33,10 +33,14 @@ export default function Login() {
         password,
       });
 
-      const { token, userId, name: userName, email: userEmail, needsOnboarding } = response.data;
-      setAuth({ id: userId, email: userEmail, name: userName }, token, needsOnboarding);
+      const { token, userId, name: userName, email: userEmail, role: userRole, needsOnboarding } = response.data;
+      setAuth({ id: userId, email: userEmail, name: userName, role: userRole }, token, needsOnboarding);
       
-      if (needsOnboarding) {
+      if (userRole === "RECRUITER") {
+        router.push("/recruiter/dashboard");
+      } else if (userRole === "ADMIN") {
+        router.push("/admin/dashboard");
+      } else if (needsOnboarding) {
         router.push("/auth/onboarding");
       } else {
         router.push("/dashboard");

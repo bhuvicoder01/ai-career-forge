@@ -29,26 +29,31 @@ export default function JobsPage() {
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
-
+  const [activeTab, setActiveTab] = useState<"discovery" | "matched" | "catalog">("discovery");
+  
   // Read sync status from the global store (managed at layout level)
   const syncStatus = useSyncStore((state) => state.syncStatus);
   const isSyncing = syncStatus.status === 'SYNCING' || syncStatus.status === 'MATCHING';
 
-  const fetchRecommended = async () => {
+  const fetchJobs = async (tab: string) => {
     try {
-      const response = await api.get("/jobs/recommended");
+      const endpoint = tab === "catalog" ? "/jobs/catalog" : "/jobs/recommended";
+      const response = await api.get(endpoint);
       setJobs(response.data);
-      setFilteredJobs(response.data);
       return response.data;
     } catch (error) {
-      console.error("Failed to fetch recommended jobs:", error);
+      console.error(`Failed to fetch ${tab} jobs:`, error);
       return [];
     }
   };
 
-  // Local Filtering Logic
+  // Local Filtering & Tab Logic
   useEffect(() => {
     const filtered = jobs.filter(job => {
+      // 1. Tab Thresholds
+      if (activeTab === "matched" && job.matchScore < 80) return false;
+      
+      // 2. Search Queries
       const matchesQuery = !query || 
         job.title.toLowerCase().includes(query.toLowerCase()) || 
         job.company.toLowerCase().includes(query.toLowerCase()) ||
@@ -60,25 +65,28 @@ export default function JobsPage() {
       return matchesQuery && matchesLocation;
     });
     setFilteredJobs(filtered);
-  }, [query, location, jobs]);
+  }, [query, location, jobs, activeTab]);
 
-  // Refresh jobs when sync completes
+  // Refresh jobs when sync completes or tab changes
   useEffect(() => {
-    if (syncStatus.status === 'COMPLETED') {
-      fetchRecommended();
-    }
-  }, [syncStatus.status]);
+    const initPage = async () => {
+      setLoading(true);
+      await fetchJobs(activeTab);
+      setLoading(false);
+    };
+    initPage();
+  }, [activeTab, syncStatus.status]);
 
   // Also refresh periodically while syncing to show partial results
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isSyncing) {
-      interval = setInterval(fetchRecommended, 16000);
+      interval = setInterval(() => fetchJobs(activeTab), 16000);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isSyncing]);
+  }, [isSyncing, activeTab]);
 
   const handleReset = async () => {
     if (!confirm("This will clear all current jobs and perform a fresh, diversified sync based on your profile. Continue?")) {
@@ -90,21 +98,13 @@ export default function JobsPage() {
         await api.delete("/jobs");
         setJobs([]);
         setFilteredJobs([]);
+        setActiveTab("discovery");
     } catch (error) {
         console.error("Reset failed:", error);
     } finally {
       setSearching(false);
     }
   };
-
-  useEffect(() => {
-    const initPage = async () => {
-      setLoading(true);
-      await fetchRecommended();
-      setLoading(false);
-    };
-    initPage();
-  }, []);
 
   if (loading && jobs.length === 0 && !isSyncing) {
     return (
@@ -118,11 +118,38 @@ export default function JobsPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-card p-8 rounded-3xl border border-border shadow-sm">
-        <div className="space-y-1">
-          <h1 className="text-3xl md:text-5xl font-black tracking-tight text-foreground">Job Discovery</h1>
-          <p className="text-muted-foreground font-medium max-w-lg">
-            AI-powered semantic matches curated specifically for your profile.
-          </p>
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <h1 className="text-3xl md:text-5xl font-black tracking-tight text-foreground">Job Discovery</h1>
+            <p className="text-muted-foreground font-medium max-w-lg">
+              {activeTab === "discovery" 
+                ? "AI-powered semantic matches curated specifically for your profile." 
+                : activeTab === "matched" 
+                  ? "High-precision opportunities that strictly align with your expertise."
+                  : "The complete global catalog of verified career opportunities."}
+            </p>
+          </div>
+          
+          {/* Tabs */}
+          <div className="flex p-1 bg-secondary/30 rounded-xl w-fit">
+            {[
+              { id: "discovery", label: "Discovery Feed" },
+              { id: "matched", label: "Top Matches" },
+              { id: "catalog", label: "All Jobs" }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                  activeTab === tab.id 
+                    ? "bg-background text-foreground shadow-sm" 
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Filter Bar */}

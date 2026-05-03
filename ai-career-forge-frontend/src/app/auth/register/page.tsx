@@ -12,6 +12,7 @@ export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"USER" | "RECRUITER">("USER");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { theme, resolvedTheme } = useTheme();
@@ -33,11 +34,17 @@ export default function Register() {
         name,
         email,
         password,
+        role,
       });
 
-      const { token, userId, name: userName, email: userEmail, needsOnboarding } = response.data;
-      setAuth({ id: userId, email: userEmail, name: userName }, token, needsOnboarding);
-      router.push("/auth/onboarding");
+      const { token, userId, name: userName, email: userEmail, role: userRole, needsOnboarding } = response.data;
+      setAuth({ id: userId, email: userEmail, name: userName, role: userRole }, token, needsOnboarding);
+      
+      if (userRole === "RECRUITER") {
+        router.push("/recruiter/dashboard");
+      } else {
+        router.push("/auth/onboarding");
+      }
     } catch (err: any) {
       console.error("Registration error:", err);
       setError(err.response?.data?.message || "Something went wrong. Please try again.");
@@ -101,6 +108,34 @@ export default function Register() {
               className="w-full px-4 py-3 border border-border bg-background rounded-xl focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all text-sm font-medium" 
               placeholder="••••••••"
             />
+          </div>
+
+          <div className="space-y-1.5 pt-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Identify Authority</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setRole("USER")}
+                className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                  role === "USER" 
+                    ? "bg-foreground text-background border-transparent shadow-lg" 
+                    : "bg-background text-muted-foreground border-border hover:bg-secondary/50"
+                }`}
+              >
+                Job Seeker
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole("RECRUITER")}
+                className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                  role === "RECRUITER" 
+                    ? "bg-foreground text-background border-transparent shadow-lg" 
+                    : "bg-background text-muted-foreground border-border hover:bg-secondary/50"
+                }`}
+              >
+                Recruiter
+              </button>
+            </div>
           </div>
           
           <button 

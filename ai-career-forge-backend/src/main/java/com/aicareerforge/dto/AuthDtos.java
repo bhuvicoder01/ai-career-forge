@@ -24,6 +24,7 @@ public class AuthDtos {
         private String name;
         private String email;
         private String password;
+        private com.aicareerforge.model.User.Role role;
     }
 
     @Data
@@ -35,6 +36,7 @@ public class AuthDtos {
         private String userId;
         private String name;
         private String email;
+        private com.aicareerforge.model.User.Role role;
         private boolean needsOnboarding;
     }
 }

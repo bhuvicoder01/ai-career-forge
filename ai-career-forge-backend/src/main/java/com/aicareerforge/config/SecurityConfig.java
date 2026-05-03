@@ -47,11 +47,18 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
+                .headers(headers -> headers
+                        .frameOptions(frameOptions -> frameOptions.disable())
+                        .addHeaderWriter(new org.springframework.security.web.header.writers.StaticHeadersWriter("X-ZENITH-SECURITY", "ACTIVE"))
+                        .contentSecurityPolicy(csp -> csp
+                                .policyDirectives("frame-ancestors 'self' http://localhost:3000 https://ai-career-forge-sable.vercel.app")
+                        )
+                )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/api/v1/public/**").permitAll()
-                        .requestMatchers("/error").permitAll()
+                        .requestMatchers("/", "/api/v1/auth/**", "/api/v1/public/**", "/error").permitAll()
+                        .requestMatchers("/api/v1/recruiter/**").hasRole("RECRUITER")
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(handler -> handler
