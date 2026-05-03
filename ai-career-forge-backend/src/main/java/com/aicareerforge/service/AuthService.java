@@ -11,6 +11,7 @@ import com.aicareerforge.repository.UserProfileRepository;
 import com.aicareerforge.repository.UserRepository;
 import com.aicareerforge.security.JwtService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,6 +33,9 @@ public class AuthService {
     private final PasswordResetTokenRepository tokenRepository;
     private final EmailService emailService;
 
+    @Value("${app.frontend-url:http://localhost:3000}")
+    private String frontendUrl;
+
     public void forgotPassword(String email) {
         var user = repository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("No user found with this email"));
@@ -47,8 +51,8 @@ public class AuthService {
                 .build();
         tokenRepository.save(resetToken);
 
-        // We use localhost:3000 for the frontend link
-        String resetLink = "http://localhost:3000/auth/reset-password?token=" + token;
+        // We use the configured frontend URL
+        String resetLink = frontendUrl + "/auth/reset-password?token=" + token;
         emailService.sendPasswordResetEmail(email, resetLink);
     }
 
