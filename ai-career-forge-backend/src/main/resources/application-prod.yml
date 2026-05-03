@@ -42,7 +42,7 @@ spring:
       uri: ${MONGODB_URI}
   mail:
     host: ${SMTP_HOST:smtp.gmail.com}
-    port: ${SMTP_PORT:587}
+    port: ${SMTP_PORT:465}
     username: ${SMTP_USERNAME}
     password: ${SMTP_PASSWORD}
     properties:
@@ -50,7 +50,13 @@ spring:
         smtp:
           auth: true
           starttls:
-            enable: true
+            enable: ${SMTP_STARTTLS_ENABLE:true}
+          ssl:
+            enable: ${SMTP_SSL_ENABLE:false}
+          socketFactory:
+            port: ${SMTP_PORT:465}
+            class: ${SMTP_SSL_CLASS:javax.net.DefaultSocketFactory}
+            fallback: false
 
   security:
     oauth2:
