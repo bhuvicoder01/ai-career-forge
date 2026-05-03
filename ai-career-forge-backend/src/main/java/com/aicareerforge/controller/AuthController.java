@@ -38,4 +38,16 @@ public class AuthController {
     public ResponseEntity<AuthResponse> setRole(@org.springframework.security.core.annotation.AuthenticationPrincipal com.aicareerforge.model.User user, @RequestBody java.util.Map<String, String> request) {
         return ResponseEntity.ok(authService.updateRole(user.getId(), request.get("role")));
     }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(@RequestBody java.util.Map<String, String> request) {
+        authService.forgotPassword(request.get("email"));
+        return ResponseEntity.ok("Recovery protocol initiated. Check your email.");
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(@RequestBody java.util.Map<String, String> request) {
+        authService.resetPassword(request.get("token"), request.get("newPassword"));
+        return ResponseEntity.ok("Neural access restored. Password updated.");
+    }
 }

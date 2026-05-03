@@ -17,14 +17,14 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       const token = searchParams.get("token");
       const tempPass = searchParams.get("tempPass");
 
-      if (token) {
+      if (token && pathname !== "/auth/reset-password") {
         setToken(token);
         if (tempPass) {
           sessionStorage.setItem("zenith_temp_pass", tempPass);
         }
       }
 
-      if (token || isAuthenticated) {
+      if ((token && pathname !== "/auth/reset-password") || isAuthenticated) {
         try {
           // Validate session and fetch full user info
           const userRes = await api.get("/auth/me");
@@ -39,8 +39,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       
       setIsReady(true);
 
-      // Clean the URL if token was present
-      if (token) {
+      // Clean the URL if token was present, but NOT on the reset-password page
+      if (token && pathname !== "/auth/reset-password") {
         const nextUrl = pathname;
         router.replace(nextUrl);
       }

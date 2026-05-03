@@ -88,7 +88,10 @@ export default function Login() {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Password</label>
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">Password</label>
+              <Link href="/auth/forgot-password" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors">Forgot password?</Link>
+            </div>
             <input 
               type="password" 
               required

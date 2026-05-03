@@ -5,6 +5,8 @@ import com.aicareerforge.dto.AuthDtos.AuthResponse;
 import com.aicareerforge.dto.AuthDtos.RegisterRequest;
 import com.aicareerforge.model.User;
 import com.aicareerforge.model.UserProfile;
+import com.aicareerforge.model.PasswordResetToken;
+import com.aicareerforge.repository.PasswordResetTokenRepository;
 import com.aicareerforge.repository.UserProfileRepository;
 import com.aicareerforge.repository.UserRepository;
 import com.aicareerforge.security.JwtService;
@@ -13,6 +15,9 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +29,47 @@ public class AuthService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final UserProfileService userProfileService;
+    private final PasswordResetTokenRepository tokenRepository;
+    private final EmailService emailService;
+
+    public void forgotPassword(String email) {
+        var user = repository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("No user found with this email"));
+
+        // Delete any existing tokens for this email
+        tokenRepository.deleteByEmail(email);
+
+        String token = UUID.randomUUID().toString();
+        PasswordResetToken resetToken = PasswordResetToken.builder()
+                .email(email)
+                .token(token)
+                .expiryDate(LocalDateTime.now().plusHours(1))
+                .build();
+        tokenRepository.save(resetToken);
+
+        // We use localhost:3000 for the frontend link
+        String resetLink = "http://localhost:3000/auth/reset-password?token=" + token;
+        emailService.sendPasswordResetEmail(email, resetLink);
+    }
+
+    public void resetPassword(String token, String newPassword) {
+        var resetToken = tokenRepository.findByToken(token)
+                .orElseThrow(() -> new RuntimeException("Invalid or expired token"));
+
+        if (resetToken.isExpired()) {
+            tokenRepository.delete(resetToken);
+            throw new RuntimeException("Invalid or expired token");
+        }
+
+        var user = repository.findByEmail(resetToken.getEmail())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        repository.save(user);
+        
+        // Clean up the token after use
+        tokenRepository.delete(resetToken);
+    }
 
     public AuthResponse register(RegisterRequest request) {
         if (repository.existsByEmail(request.getEmail())) {
