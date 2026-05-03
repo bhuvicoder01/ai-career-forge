@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import useAuthStore from "@/store/useAuthStore";
+import api from "@/lib/api";
 
 export default function AdminSettings() {
   const { theme, setTheme } = useTheme();
