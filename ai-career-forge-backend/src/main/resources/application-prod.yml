@@ -42,7 +42,7 @@ spring:
       uri: ${MONGODB_URI}
   mail:
     host: ${SMTP_HOST:smtp.gmail.com}
-    port: ${SMTP_PORT:465}
+    port: ${SMTP_PORT:587}
     username: ${SMTP_USERNAME}
     password: ${SMTP_PASSWORD}
     properties:
@@ -51,13 +51,24 @@ spring:
           auth: true
           starttls:
             enable: ${SMTP_STARTTLS_ENABLE:true}
+            required: true
           ssl:
             enable: ${SMTP_SSL_ENABLE:false}
           socketFactory:
             port: ${SMTP_PORT:465}
-            class: ${SMTP_SSL_CLASS:javax.net.DefaultSocketFactory}
+            class: ${SMTP_SSL_CLASS:javax.net.ssl.SSLSocketFactory}
             fallback: false
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
+  resend:
+    api-key: ${RESEND_API_KEY}
+    from-email: ${RESEND_FROM_EMAIL}
+        
+  sendgrid:
+    api-key: ${SENDGRID_API_KEY}
+    from-email: ${SENDGRID_FROM_EMAIL}
   security:
     oauth2:
       client:
@@ -109,6 +120,10 @@ logo:
 
 brandfetch:
   api-token: ${BRANDFETCH_TOKEN}
+
+resend:
+  api-key: ${RESEND_API_KEY}
+  from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}
 
 logging:
   level:
