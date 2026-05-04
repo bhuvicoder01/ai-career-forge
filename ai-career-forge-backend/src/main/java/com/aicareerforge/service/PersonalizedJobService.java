@@ -27,6 +27,8 @@ public class PersonalizedJobService {
 
     @Data
     @Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
     public static class JobDashboardResponse {
         private List<Job> topPicks;
         private List<Job> likelyToHearBack;
