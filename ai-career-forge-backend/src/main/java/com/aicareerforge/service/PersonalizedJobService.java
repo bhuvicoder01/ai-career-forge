@@ -35,6 +35,7 @@ public class PersonalizedJobService {
         private List<Job> easyApply;
     }
 
+    @org.springframework.cache.annotation.Cacheable(value = "jobDashboard", key = "#profile.userId", unless = "#result == null")
     public JobDashboardResponse getPersonalizedDashboard(UserProfile profile) {
         String userId = profile.getUserId();
         
@@ -120,6 +121,7 @@ public class PersonalizedJobService {
                 .collect(Collectors.toList());
     }
 
+    @org.springframework.cache.annotation.CacheEvict(value = "jobDashboard", key = "#userId")
     public void trackActivity(String userId, UserActivity.ActivityType type, String jobId, String searchQuery) {
         UserActivity activity = UserActivity.builder()
                 .userId(userId)

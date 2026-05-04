@@ -40,6 +40,17 @@ spring:
   data:
     mongodb:
       uri: ${MONGODB_URI}
+    redis:
+      url: ${REDIS_URL:}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 60000
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000 # 1 hour default
+      
   mail:
     host: ${SMTP_HOST:smtp.gmail.com}
     port: ${SMTP_PORT:587}

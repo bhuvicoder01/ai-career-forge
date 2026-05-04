@@ -309,6 +309,7 @@ public class JobService {
     //     scheduledJobSync();
     // }
 
+    @org.springframework.cache.annotation.Cacheable(value = "recommendedJobs", key = "#profile.userId", unless = "#result == null || #result.isEmpty()")
     public List<Job> getRecommendedJobs(UserProfile profile) {
         String userProfileData = profile.getRawResumeText();
         
@@ -419,6 +420,7 @@ public class JobService {
      * Returns all jobs applicable to the user (user-specific + global pool)
      * with calculated match scores. Sorted by score descending.
      */
+    @org.springframework.cache.annotation.Cacheable(value = "jobCatalog", key = "#profile.userId", unless = "#result == null || #result.isEmpty()")
     public List<Job> getJobCatalog(UserProfile profile) {
         String userId = profile.getUserId();
         log.info("Fetching complete job catalog for user: {}", userId);
@@ -706,6 +708,11 @@ public class JobService {
     /**
      * Purge all jobs for a specific user only.
      */
+    @org.springframework.cache.annotation.Caching(evict = {
+        @org.springframework.cache.annotation.CacheEvict(value = "jobDashboard", key = "#userId"),
+        @org.springframework.cache.annotation.CacheEvict(value = "recommendedJobs", key = "#userId"),
+        @org.springframework.cache.annotation.CacheEvict(value = "jobCatalog", key = "#userId")
+    })
     public void purgeJobsForUser(String userId) {
         log.info("Purging all jobs for user: {}", userId);
         jobRepository.deleteAllByUserId(userId);
