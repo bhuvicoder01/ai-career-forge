@@ -367,7 +367,7 @@ public class JobService {
                         job.setMatchScore(finalScore);
                         
                         // Load user-specific match data (Explanation, Score, etc.)
-                        UserJobMatch match = userJobMatchRepository.findByUserIdAndJobId(profile.getUserId(), job.getId()).orElse(null);
+                        UserJobMatch match = userJobMatchRepository.findFirstByUserIdAndJobId(profile.getUserId(), job.getId()).orElse(null);
                         if (match != null) {
                             job.setRelevanceExplanation(match.getRelevanceExplanation());
                             // Override with persisted score if available
@@ -438,7 +438,7 @@ public class JobService {
         for (Job job : allJobs) {
             Double cachedScore = getCachedScore(userId, job.getId());
             
-            UserJobMatch match = userJobMatchRepository.findByUserIdAndJobId(userId, job.getId()).orElse(null);
+            UserJobMatch match = userJobMatchRepository.findFirstByUserIdAndJobId(userId, job.getId()).orElse(null);
             if (match != null) {
                 job.setRelevanceExplanation(match.getRelevanceExplanation());
                 job.setMatchScore(match.getMatchScore() != null ? match.getMatchScore() : cachedScore);
@@ -465,15 +465,24 @@ public class JobService {
         
         return jobs.stream()
                 .filter(Objects::nonNull)
+                .filter(job -> job.getId() != null)
                 .collect(Collectors.toMap(
                     Job::getId,
                     job -> job,
-                    (existing, replacement) -> existing.getMatchScore() > replacement.getMatchScore() ? existing : replacement,
+                    (existing, replacement) -> {
+                        double s1 = existing.getMatchScore() != null ? existing.getMatchScore() : 0.0;
+                        double s2 = replacement.getMatchScore() != null ? replacement.getMatchScore() : 0.0;
+                        return s1 >= s2 ? existing : replacement;
+                    },
                     java.util.LinkedHashMap::new
                 ))
                 .values()
                 .stream()
-                .sorted((a, b) -> Double.compare(b.getMatchScore(), a.getMatchScore()))
+                .sorted((a, b) -> {
+                    double s1 = a.getMatchScore() != null ? a.getMatchScore() : 0.0;
+                    double s2 = b.getMatchScore() != null ? b.getMatchScore() : 0.0;
+                    return Double.compare(s2, s1);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -782,7 +791,7 @@ public class JobService {
                 try {
                     Thread.sleep(1000); 
                     
-                    UserJobMatch match = userJobMatchRepository.findByUserIdAndJobId(userId, job.getId())
+                    UserJobMatch match = userJobMatchRepository.findFirstByUserIdAndJobId(userId, job.getId())
                             .orElse(UserJobMatch.builder().userId(userId).jobId(job.getId()).build());
 
                     if (match.getRelevanceExplanation() == null || match.getRelevanceExplanation().isBlank()) {

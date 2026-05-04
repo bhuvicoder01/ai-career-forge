@@ -4,12 +4,15 @@ import com.aicareerforge.model.Job;
 import com.aicareerforge.model.JobDetailResponse;
 import com.aicareerforge.model.JobSyncStatus;
 import com.aicareerforge.model.User;
+import com.aicareerforge.model.UserActivity;
 import com.aicareerforge.model.UserProfile;
 import com.aicareerforge.service.JobService;
 import com.aicareerforge.service.JobSyncService;
+import com.aicareerforge.service.PersonalizedJobService;
 import com.aicareerforge.service.SyncSseEmitterRegistry;
 import com.aicareerforge.service.UserProfileService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +22,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/jobs")
 @RequiredArgsConstructor
@@ -28,14 +32,33 @@ public class JobController {
     private final UserProfileService userProfileService;
     private final JobSyncService jobSyncService;
     private final SyncSseEmitterRegistry sseRegistry;
+    private final PersonalizedJobService personalizedJobService;
 
     @GetMapping("/public")
     public ResponseEntity<List<Job>> getPublicJobs() {
         return ResponseEntity.ok(jobService.getRecentJobs());
     }
 
+    @GetMapping("/dashboard")
+    public ResponseEntity<PersonalizedJobService.JobDashboardResponse> getJobDashboard(@AuthenticationPrincipal User user) {
+        UserProfile profile = userProfileService.getProfile(user.getId());
+        return ResponseEntity.ok(personalizedJobService.getPersonalizedDashboard(profile));
+    }
+
+    @PostMapping("/{id}/track")
+    public ResponseEntity<Void> trackActivity(
+            @PathVariable String id,
+            @RequestParam UserActivity.ActivityType type,
+            @AuthenticationPrincipal User user) {
+        personalizedJobService.trackActivity(user.getId(), type, id, null);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping
-    public ResponseEntity<Page<Job>> getJobs(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+    public ResponseEntity<Page<Job>> getJobs(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size, @AuthenticationPrincipal User user) {
+        if (user != null) {
+            personalizedJobService.trackActivity(user.getId(), UserActivity.ActivityType.SEARCH, null, "Page " + page);
+        }
         return ResponseEntity.ok(jobService.getJobs(page, size));
     }
 
@@ -53,9 +76,12 @@ public class JobController {
     @GetMapping("/catalog")
     public ResponseEntity<List<Job>> getJobCatalog(@AuthenticationPrincipal User user) {
         try {
+            if (user == null) return ResponseEntity.status(401).build();
             UserProfile profile = userProfileService.getProfile(user.getId());
+            if (profile == null) return ResponseEntity.ok(List.of());
             return ResponseEntity.ok(jobService.getJobCatalog(profile));
         } catch (Exception e) {
+            log.error("Failed to fetch job catalog for user {}: {}", user != null ? user.getId() : "null", e.getMessage(), e);
             return ResponseEntity.status(500).build();
         }
     }

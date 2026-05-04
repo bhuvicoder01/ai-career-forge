@@ -3,6 +3,7 @@ package com.aicareerforge.config;
 import com.aicareerforge.security.CustomUserDetailsService;
 import com.aicareerforge.security.JwtAuthenticationFilter;
 import com.aicareerforge.security.OAuth2SuccessHandler;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -55,6 +56,7 @@ public class SecurityConfig {
                         )
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/", "/api/v1/auth/**", "/api/v1/public/**", "/api/v1/assistant/**", "/api/v1/jobs/public", "/error").permitAll()
                         .requestMatchers("/api/v1/recruiter/**").hasRole("RECRUITER")
