@@ -43,6 +43,13 @@ public class SecurityConfig {
     @Value("${cors.allowed-origins}")
     private List<String> allowedOrigins;
 
+    private String getCspPolicy() {
+        String origins = String.join(" ", allowedOrigins.stream()
+                .map(String::trim)
+                .toList());
+        return "frame-ancestors 'self' " + origins;
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -52,7 +59,7 @@ public class SecurityConfig {
                         .frameOptions(frameOptions -> frameOptions.disable())
                         .addHeaderWriter(new org.springframework.security.web.header.writers.StaticHeadersWriter("X-ZENITH-SECURITY", "ACTIVE"))
                         .contentSecurityPolicy(csp -> csp
-                                .policyDirectives("frame-ancestors 'self' http://localhost:3000 https://ai-career-forge-sable.vercel.app")
+                                .policyDirectives(getCspPolicy())
                         )
                 )
                 .authorizeHttpRequests(auth -> auth
@@ -84,7 +91,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedOrigins(allowedOrigins.stream().map(String::trim).toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
