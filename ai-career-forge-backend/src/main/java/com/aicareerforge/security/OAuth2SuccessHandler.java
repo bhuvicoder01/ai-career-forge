@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -27,7 +28,30 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     @Value("${app.frontend-url}")
-    private String frontendUrl;
+    private List<String> frontendUrls;
+
+    private String getTargetFrontendUrl(HttpServletRequest request) {
+        List<String> trimmedUrls = frontendUrls.stream()
+                .map(String::trim)
+                .toList();
+
+        if (trimmedUrls.isEmpty()) {
+            return "http://localhost:3000";
+        }
+
+        // Try to match against Referer or Origin if available
+        String referer = request.getHeader("Referer");
+        String origin = request.getHeader("Origin");
+
+        for (String url : trimmedUrls) {
+            if ((origin != null && origin.startsWith(url)) || 
+                (referer != null && referer.startsWith(url))) {
+                return url;
+            }
+        }
+
+        return trimmedUrls.get(0);
+    }
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
@@ -72,7 +96,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             redirectPath = "/auth/onboarding";
         }
         
-        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUriString(frontendUrl)
+        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUriString(getTargetFrontendUrl(request))
                 .path(redirectPath)
                 .queryParam("token", token);
         

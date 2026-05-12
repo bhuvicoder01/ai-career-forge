@@ -18,6 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -34,7 +35,14 @@ public class AuthService {
     private final EmailService emailService;
 
     @Value("${app.frontend-url:http://localhost:3000}")
-    private String frontendUrl;
+    private List<String> frontendUrls;
+
+    private String getPrimaryFrontendUrl() {
+        return frontendUrls.stream()
+                .map(String::trim)
+                .findFirst()
+                .orElse("http://localhost:3000");
+    }
 
     public void forgotPassword(String email) {
         var user = repository.findByEmail(email)
@@ -51,8 +59,8 @@ public class AuthService {
                 .build();
         tokenRepository.save(resetToken);
 
-        // We use the configured frontend URL
-        String resetLink = frontendUrl + "/auth/reset-password?token=" + token;
+        // We use the configured primary frontend URL
+        String resetLink = getPrimaryFrontendUrl() + "/auth/reset-password?token=" + token;
         emailService.sendPasswordResetEmail(email, resetLink);
     }
 
